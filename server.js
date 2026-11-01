@@ -7,11 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 导入 Cloudflare Edge 核心处理函数
-import { onRequestGet as handleSearch } from './functions/api/search.js';
-import { onRequest as handleResolve } from './functions/api/resolve.js';
-import { onRequestGet as handleLyric } from './functions/api/lyric.js';
-import { onRequestGet as handleSourcesGet, onRequestPost as handleSourcesPost } from './functions/api/sources.js';
+// 导入 Edge 核心处理函数
+import { onRequestGet as handleSearch } from './api/search.js';
+import { onRequest as handleResolve } from './api/resolve.js';
+import { onRequestGet as handleLyric } from './api/lyric.js';
+import { onRequestGet as handleSourcesGet, onRequestPost as handleSourcesPost } from './api/sources.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
