@@ -1,0 +1,9 @@
+{
+  "name": "music-underlying",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "YY-Music Minimalist Universal Core (Cloudflare Pages + Standard Node.js)",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
