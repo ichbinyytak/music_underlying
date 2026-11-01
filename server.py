@@ -34,10 +34,6 @@ class SourceAppHandler(SimpleHTTPRequestHandler):
             self.path = "/index.html"
             return super().do_GET()
 
-        if path in ["/sources", "/sources.html"]:
-            self.path = "/sources.html"
-            return super().do_GET()
-
         if path == "/api/sources":
             # 如果尚未测试过，自动测一次
             ordered = source_hub.get_ordered_sources()
@@ -113,7 +109,7 @@ class SourceAppHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("0.0.0.0", PORT), SourceAppHandler)
-    print(f"⚡ YY-Music 音源控制台服务已启动: http://localhost:{PORT}/sources.html")
+    print(f"⚡ YY-Music 极简底层服务已启动: http://localhost:{PORT}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
