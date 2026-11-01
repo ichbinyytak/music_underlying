@@ -19,6 +19,7 @@ import time
 import ctypes
 import threading
 import difflib
+import unicodedata
 import urllib.request
 import urllib.parse
 
@@ -66,19 +67,26 @@ FALLBACK_CHAR_MAP = {
     '闊': '阔', '轉': '转', '移': '移', '後': '后', '話': '话', '過': '过'
 }
 
-def to_simple(text: str) -> str:
-    """文本标准化：原生 OpenCC 繁转简 -> 小写 -> 剥离首尾空白"""
+def strip_accents(text: str) -> str:
+    """去除拉丁/拼音变音符 (如 Sān-Z -> San-Z, Beyoncé -> Beyonce)"""
     if not text:
         return ""
+    nfkd = unicodedata.normalize('NFKD', text)
+    return ''.join([c for c in nfkd if not unicodedata.combining(c)])
+
+def to_simple(text: str) -> str:
+    """文本标准化：原生 OpenCC 繁转简 -> 去除变音符 -> 小写 -> 剥离首尾空白"""
+    if not text:
+        return ""
+    t = text
     if _opencc_convert:
         try:
-            return _opencc_convert(text).lower().strip()
-        except Exception as e:
-            # print("kw lyric error:", e)
+            t = _opencc_convert(t)
+        except Exception:
             pass
-    # 降级备用
-    res = [FALLBACK_CHAR_MAP.get(ch, ch) for ch in text]
-    return "".join(res).lower().strip()
+    else:
+        t = "".join([FALLBACK_CHAR_MAP.get(ch, ch) for ch in t])
+    return strip_accents(t).lower().strip()
 
 def clean_brackets(text: str) -> str:
     """剔除括号及括号内的修饰词，剥离 Remastered / Live 等非核心词"""
@@ -86,7 +94,7 @@ def clean_brackets(text: str) -> str:
 
 def clean_punctuation(text: str) -> str:
     """剔除所有标点符号和空格，保留纯字词"""
-    return re.sub(r'[\s\-_·\.,，。、!！?？~～:：/\\&+\'"]+', '', text or '')
+    return re.sub(r'[\s\-_·\.,，。、!！?？~～:：/\\&+\'\"%]+', '', text or '')
 
 
 # ========================================================
@@ -156,26 +164,31 @@ def calculate_song_match_score(cand_title: str, cand_artist: str, cand_album: st
     else:
         score += 25.0
 
-    # 3. 歌手无序 Token 集合交集对齐 (最高 35 分)
-    if target_artist:
+    # 3. 歌手无序 Token 集合交集对齐 (最高 35 分，支持合唱、feat、多人别名)
+    if tgt_art_simp:
         c_tokens = [a.strip() for a in re.split(r'[/,、&+\s\(\)（）]+', art_simp) if a.strip()]
         t_tokens = [a.strip() for a in re.split(r'[/,、&+\s\(\)（）]+', tgt_art_simp) if a.strip()]
 
-        matched_tokens = 0
+        matched_any = False
+        match_count = 0
         for t in t_tokens:
-            if any(t == ct or (len(t) >= 2 and (t in ct or ct in t)) for ct in c_tokens):
-                matched_tokens += 1
+            if any(t == ct or (len(t) >= 2 and len(ct) >= 2 and (t in ct or ct in t)) for ct in c_tokens):
+                match_count += 1
+                matched_any = True
+            elif any(difflib.SequenceMatcher(None, t, ct).ratio() >= 0.75 for ct in c_tokens):
+                match_count += 0.8
+                matched_any = True
             elif t in art_simp or art_simp in t:
-                matched_tokens += 0.8
-            else:
-                # 歌手错别字容错
-                if any(difflib.SequenceMatcher(None, t, ct).ratio() >= 0.75 for ct in c_tokens):
-                    matched_tokens += 0.8
+                match_count += 0.8
+                matched_any = True
 
-        token_ratio = min(1.0, matched_tokens / max(1, len(t_tokens))) if t_tokens else 0.5
-        score += 35.0 * token_ratio
+        if matched_any:
+            token_ratio = max(0.85, match_count / max(1, len(t_tokens)))
+            score += 35.0 * token_ratio
+        else:
+            score += 10.0
     else:
-        score += 20.0
+        score += 25.0
 
     # 4. 专辑契合度 (最高 10 分)
     if cand_album and len(alb_simp) > 1:
@@ -199,85 +212,144 @@ def calculate_song_match_score(cand_title: str, cand_artist: str, cand_album: st
 
 
 # ========================================================
-# 3. 歌曲检索接口 (自动繁转简 + 智能分词提取)
+# 3. 歌曲检索接口 (自动繁转简 + 智能多行意图分词提取)
 # ========================================================
+
+def parse_search_intent(query_str: str) -> tuple:
+    """
+    智能解析用户输入意图：
+    - 多行输入 (如用户直接复制自歌单: 第1行歌名, 第2行歌手)
+    - 常见分隔符 (歌名 - 歌手 或 歌手 - 歌名)
+    - 英文多词歌名保护 (如 Hotel California, 1% Low Battery Girl)
+    返回: (target_title, target_artist, search_queries_list)
+    """
+    raw = query_str.strip()
+    lines = [l.strip() for l in raw.splitlines() if l.strip()]
+
+    target_title = ""
+    target_artist = ""
+
+    if len(lines) >= 2:
+        target_title = clean_brackets(lines[0]) or lines[0]
+        target_artist = " ".join(lines[1:])
+    else:
+        text = lines[0] if lines else ""
+        for sep in [' - ', '——', '—']:
+            if sep in text:
+                p1, p2 = text.split(sep, 1)
+                target_title = clean_brackets(p1) or p1
+                target_artist = p2.strip()
+                break
+        else:
+            parts = text.split()
+            # 仅当首词含中文且末尾词为简短作者时，按中文习惯切分
+            if len(parts) >= 2 and re.search(r'[\u4e00-\u9fa5]', parts[0]) and len(parts[-1]) <= 10:
+                target_title = " ".join(parts[:-1])
+                target_artist = parts[-1]
+            else:
+                target_title = clean_brackets(text) or text
+                target_artist = ""
+
+    clean_t = clean_brackets(target_title) or target_title
+    clean_a = re.sub(r'[\(（\[【].*?[\)）\]】]', '', target_artist).strip()
+    clean_t = re.sub(r'[\s\-_·\.,，。、!！?？~～:：/\\+]+', ' ', clean_t).strip()
+    clean_a = re.sub(r'[\s·\.,，。、!！?？~～:：/\\&+\'"]+', ' ', clean_a).strip()
+
+    search_queries = []
+    if clean_t and clean_a:
+        first_a = clean_a.split()[0] if clean_a.split() else clean_a
+        search_queries.append(f"{clean_t} {first_a}".strip())
+        search_queries.append(clean_t)
+    elif clean_t:
+        search_queries.append(clean_t)
+
+    return target_title, target_artist, search_queries
+
 
 def search_candidates(keyword: str, target_artist: str = "", limit: int = 8) -> list:
     """
     轻量快速检索歌曲候选列表，全链路经过繁转简与高容错打分清洗
     返回按匹配得分从高到低排序的正规候选列表
     """
-    # 1. 规范化输入：OpenCC 繁转简
-    simplified_k = to_simple(clean_brackets(keyword))
-    if not simplified_k:
+    if not keyword or not keyword.strip():
         return []
 
-    # 2. 智能提取目标标题与目标歌手（支持语序颠倒与空格分词）
-    parts = simplified_k.split()
-    if not target_artist:
-        if len(parts) >= 2:
-            target_title = " ".join(parts[:-1])
-            target_artist = parts[-1]
-        else:
-            target_title = simplified_k
-            target_artist = ""
+    if target_artist:
+        tgt_t = clean_brackets(keyword) or keyword
+        tgt_a = target_artist
+        clean_sq = f"{tgt_t} {tgt_a}".strip()
+        search_queries = [clean_sq, tgt_t]
     else:
-        target_title = simplified_k
-        target_artist = to_simple(target_artist)
+        tgt_t, tgt_a, search_queries = parse_search_intent(keyword)
 
     results = []
+    seen_keys = set()
 
-    # 3. 酷我轻量检索通道
-    try:
-        url_kw = f"https://search.kuwo.cn/r.s?client=kt&all={urllib.parse.quote(simplified_k)}&pn=0&rn={limit}&uid=794762528&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newsearch=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1"
-        req = urllib.request.Request(url_kw, headers={'User-Agent': 'okhttp/3.10.0'})
-        with urllib.request.urlopen(req, timeout=2.0) as r:
-            data = json.loads(r.read().decode('utf-8'))
-            for it in data.get('abslist', []):
-                sname = it.get('SONGNAME', '')
-                sart = it.get('ARTIST', '')
-                salb = it.get('ALBUM', '')
-                sdur = it.get('DURATION')
-                rid = it.get('MUSICRID', '').replace('MUSIC_', '')
-                score, ok = calculate_song_match_score(sname, sart, salb, target_title, target_artist, sdur)
-                if ok and rid:
-                    results.append({
-                        "platform": "kw",
-                        "id": rid,
-                        "title": sname,
-                        "artist": sart,
-                        "album": salb,
-                        "duration": sdur,
-                        "score": round(score, 1)
-                    })
-    except Exception:
-        pass
+    # 依次在各主平台尝试搜索词列表 (优先精确词，次选歌名原词)
+    for sq in search_queries:
+        if len(results) >= limit:
+            break
+        sq_enc = urllib.parse.quote(sq)
 
-    # 4. 网易云轻量检索通道
-    try:
-        url_ne = f"http://music.163.com/api/search/get?s={urllib.parse.quote(simplified_k)}&type=1&offset=0&limit={limit}"
-        req = urllib.request.Request(url_ne, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=2.0) as r:
-            data = json.loads(r.read().decode('utf-8'))
-            for s in data.get('result', {}).get('songs', []):
-                sname = s.get('name', '')
-                sart = "/".join([a.get('name', '') for a in s.get('artists', []) if a.get('name')])
-                salb = s.get('album', {}).get('name', '')
-                sdur = round(s.get('duration', 0) / 1000) if s.get('duration') else None
-                sid = str(s.get('id', ''))
-                score, ok = calculate_song_match_score(sname, sart, salb, target_title, target_artist, sdur)
-                if ok and sid:
-                    results.append({
-                        "platform": "wy",
-                        "id": sid,
-                        "title": sname,
-                        "artist": sart,
-                        "album": salb,
-                        "duration": sdur,
-                        "score": round(score, 1)
-                    })
-    except Exception:
-        pass
+        # 1. 酷我轻量检索通道
+        try:
+            url_kw = f"https://search.kuwo.cn/r.s?client=kt&all={sq_enc}&pn=0&rn={limit}&uid=794762528&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newsearch=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1"
+            req = urllib.request.Request(url_kw, headers={'User-Agent': 'okhttp/3.10.0'})
+            with urllib.request.urlopen(req, timeout=2.0) as r:
+                data = json.loads(r.read().decode('utf-8'))
+                for it in data.get('abslist', []):
+                    sname = it.get('SONGNAME', '')
+                    sart = it.get('ARTIST', '')
+                    salb = it.get('ALBUM', '')
+                    sdur = it.get('DURATION')
+                    rid = it.get('MUSICRID', '').replace('MUSIC_', '')
+                    key = ('kw', rid)
+                    if key in seen_keys:
+                        continue
+                    score, ok = calculate_song_match_score(sname, sart, salb, tgt_t, tgt_a, sdur)
+                    if ok and rid:
+                        seen_keys.add(key)
+                        results.append({
+                            "platform": "kw",
+                            "id": rid,
+                            "title": sname,
+                            "artist": sart,
+                            "album": salb,
+                            "duration": sdur,
+                            "score": round(score, 1)
+                        })
+        except Exception:
+            pass
+
+        # 2. 网易云轻量检索通道
+        try:
+            url_ne = f"http://music.163.com/api/search/get?s={sq_enc}&type=1&offset=0&limit={limit}"
+            req = urllib.request.Request(url_ne, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=2.0) as r:
+                data = json.loads(r.read().decode('utf-8'))
+                for s in data.get('result', {}).get('songs', []):
+                    sname = s.get('name', '')
+                    sart = "/".join([a.get('name', '') for a in s.get('artists', []) if a.get('name')])
+                    salb = s.get('album', {}).get('name', '')
+                    sdur = round(s.get('duration', 0) / 1000) if s.get('duration') else None
+                    sid = str(s.get('id', ''))
+                    key = ('wy', sid)
+                    if key in seen_keys:
+                        continue
+                    score, ok = calculate_song_match_score(sname, sart, salb, tgt_t, tgt_a, sdur)
+                    if ok and sid:
+                        seen_keys.add(key)
+                        results.append({
+                            "platform": "wy",
+                            "id": sid,
+                            "title": sname,
+                            "artist": sart,
+                            "album": salb,
+                            "duration": sdur,
+                            "score": round(score, 1)
+                        })
+        except Exception:
+            pass
 
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
