@@ -147,8 +147,12 @@
     async function loadSources() {
       try {
         const res = await fetch('/api/sources');
-        renderSources(await res.json());
-      } catch (e) { console.error(e); }
+        const list = await res.json();
+        renderSources(list);
+      } catch (e) {
+        document.getElementById('sourceList').innerHTML = 
+          '<li style="color:#d93025;padding:8px 0;">音源加载失败 <button onclick="loadSources()" style="padding:1px 4px;font-size:10px;">重试</button></li>';
+      }
     }
 
     async function speedTest() {
@@ -158,6 +162,8 @@
       try {
         const res = await fetch('/api/sources/test', { method: 'POST' });
         renderSources(await res.json());
+      } catch (e) {
+        alert("测速异常: " + e.message);
       } finally {
         btn.innerText = "⚡测速重排";
         btn.disabled = false;
@@ -166,14 +172,28 @@
 
     function renderSources(sources) {
       const ul = document.getElementById('sourceList');
-      ul.innerHTML = sources.map((s, idx) => `
-        <li class="source-item ${idx < 2 ? 'top' : ''}">
-          <span>${idx + 1}. ${s.name}</span>
-          <span class="${s.status === 'ok' ? 'status-ok' : 'status-fail'}">
-            ${s.status === 'ok' ? s.latency_ms.toFixed(0) + 'ms' : '×'}
-          </span>
-        </li>
-      `).join('');
+      if (!Array.isArray(sources) || sources.length === 0) {
+        ul.innerHTML = '<li style="color:#888;padding:8px 0;">暂无音源</li>';
+        return;
+      }
+      ul.innerHTML = sources.map((s, idx) => {
+        const isOk = (s.status === 'ok');
+        let statusClass = 'status-fail';
+        let statusTxt = '×';
+        if (isOk) {
+          statusClass = 'status-ok';
+          statusTxt = (typeof s.latency_ms === 'number' && !isNaN(s.latency_ms)) ? Math.round(s.latency_ms) + 'ms' : '●';
+        } else if (s.status === 'untested') {
+          statusClass = '';
+          statusTxt = '○';
+        }
+        return `
+          <li class="source-item ${idx < 2 && isOk ? 'top' : ''}">
+            <span title="${s.name || ''}">${idx + 1}. ${s.name || '未知音源'}</span>
+            <span class="${statusClass}">${statusTxt}</span>
+          </li>
+        `;
+      }).join('');
     }
 
     // ==========================================

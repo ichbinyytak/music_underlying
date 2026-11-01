@@ -35,17 +35,13 @@ class SourceAppHandler(SimpleHTTPRequestHandler):
             return super().do_GET()
 
         if path == "/api/sources":
-            # 如果尚未测试过，自动测一次
             ordered = source_hub.get_ordered_sources()
-            if all(s.status == "untested" for s in ordered):
-                data = source_hub.test_all()
-            else:
-                data = [{
-                    "id": s.id, "name": s.name, "platform": s.platform,
-                    "status": s.status, "latency_ms": s.latency_ms,
-                    "consecutive_fails": s.consecutive_fails,
-                    "success_count": s.success_count
-                } for s in ordered]
+            data = [{
+                "id": s.id, "name": s.name, "platform": s.platform,
+                "status": s.status, "latency_ms": s.latency_ms,
+                "consecutive_fails": s.consecutive_fails,
+                "success_count": s.success_count
+            } for s in ordered]
             self._send_json(data)
             return
 
@@ -108,6 +104,10 @@ class SourceAppHandler(SimpleHTTPRequestHandler):
         pass
 
 if __name__ == "__main__":
+    import threading
+    # 异步预热并发测速，零阻塞 HTTP 即时响应
+    threading.Thread(target=source_hub.test_all, daemon=True).start()
+
     server = ThreadingHTTPServer(("0.0.0.0", PORT), SourceAppHandler)
     print(f"⚡ YY-Music 极简底层服务已启动: http://localhost:{PORT}/")
     try:
