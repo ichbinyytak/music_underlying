@@ -177,7 +177,7 @@
         return;
       }
       ul.innerHTML = sources.map((s, idx) => {
-        const isOk = (s.status === 'ok');
+        const isOk = (s.status === 'ok' || s.status === 'active' || s.status === 'healthy');
         let statusClass = 'status-fail';
         let statusTxt = '×';
         if (isOk) {
