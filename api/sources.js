@@ -25,26 +25,8 @@ const ALL_36_SOURCES = [
         "testUrl": "https://api.injahow.cn/meting/?server=netease&type=url&id=186016"
     },
     {
-        "id": "lx_e75e0c8f",
-        "name": "[LX] Ciallo～(∠・ω< )⌒☆",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
         "id": "lx_49c8cab3",
         "name": "[LX] 溯音音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_0fa38726",
-        "name": "[LX] 全豆要",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_c179868c",
-        "name": "[LX] 全豆要",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -93,12 +75,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_b1ef15b0",
         "name": "[LX] 👖裤佬SVIP音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_800fea88",
-        "name": "[LX] Hei Music聚合源",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
