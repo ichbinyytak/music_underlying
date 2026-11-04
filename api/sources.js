@@ -79,6 +79,12 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
+        "id": "lx_800fea88",
+        "name": "[LX] Hei Music聚合源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
         "id": "lx_4b516af7",
         "name": "[LX] 𝖧౿ᥣᥣ𝗈 Ԝ𝗈𝗋ᥣᑯ",
         "platform": "kw",
@@ -87,12 +93,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_e1ef7303",
         "name": "[LX] 墨澜聚合音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_59a86b3a",
-        "name": "[LX] 星澜聚合音源 (StellarWave)",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -117,12 +117,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_b30da815",
         "name": "[LX] 杰翔聚合音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_e29d0718",
-        "name": "[LX] HYWmusic_公益版",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -177,12 +171,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_41f4c91d",
         "name": "[LX] xiaoqiu",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_53964f1a",
-        "name": "[LX] xiaowo",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
