@@ -25,8 +25,26 @@ const ALL_36_SOURCES = [
         "testUrl": "https://api.injahow.cn/meting/?server=netease&type=url&id=186016"
     },
     {
+        "id": "lx_e75e0c8f",
+        "name": "[LX] Ciallo～(∠・ω< )⌒☆",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
         "id": "lx_49c8cab3",
         "name": "[LX] 溯音音源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_0fa38726",
+        "name": "[LX] 全豆要",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_c179868c",
+        "name": "[LX] 全豆要",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -79,6 +97,12 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
+        "id": "lx_800fea88",
+        "name": "[LX] Hei Music聚合源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
         "id": "lx_4b516af7",
         "name": "[LX] 𝖧౿ᥣᥣ𝗈 Ԝ𝗈𝗋ᥣᑯ",
         "platform": "kw",
@@ -111,6 +135,12 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_b30da815",
         "name": "[LX] 杰翔聚合音源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_13c95f8e",
+        "name": "[LX] 星海音乐源",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -159,12 +189,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_41f4c91d",
         "name": "[LX] xiaoqiu",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_53964f1a",
-        "name": "[LX] xiaowo",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
