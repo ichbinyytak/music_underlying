@@ -109,12 +109,6 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
-        "id": "lx_e1ef7303",
-        "name": "[LX] 墨澜聚合音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
         "id": "lx_5decc94c",
         "name": "[LX] K×H测试",
         "platform": "kw",
@@ -133,8 +127,20 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
+        "id": "lx_f5ff9b65",
+        "name": "[LX] 西瓜糖音乐",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
         "id": "lx_b30da815",
         "name": "[LX] 杰翔聚合音源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_e29d0718",
+        "name": "[LX] HYWmusic_公益版",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -159,6 +165,12 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_743bb909",
         "name": "[LX] 👖裤佬SVIP音源(二改整合版)",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_4b129fa2",
+        "name": "[LX] ecosystem-scan",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -189,6 +201,12 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_41f4c91d",
         "name": "[LX] xiaoqiu",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_53964f1a",
+        "name": "[LX] xiaowo",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
