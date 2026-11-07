@@ -37,6 +37,12 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
+        "id": "lx_62b61565",
+        "name": "[LX] 长青SVIP音源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
         "id": "lx_0fa38726",
         "name": "[LX] 全豆要",
         "platform": "kw",
@@ -109,6 +115,18 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
+        "id": "lx_e1ef7303",
+        "name": "[LX] 墨澜聚合音源",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_59a86b3a",
+        "name": "[LX] 星澜聚合音源 (StellarWave)",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
         "id": "lx_5decc94c",
         "name": "[LX] K×H测试",
         "platform": "kw",
@@ -123,12 +141,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_e992da22",
         "name": "[LX] 月落音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_f5ff9b65",
-        "name": "[LX] 西瓜糖音乐",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
@@ -201,18 +213,6 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_41f4c91d",
         "name": "[LX] xiaoqiu",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_53964f1a",
-        "name": "[LX] xiaowo",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
-        "id": "lx_fcba7101",
-        "name": "[LX] xiaoyun",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     }
