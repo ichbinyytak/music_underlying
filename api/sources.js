@@ -37,12 +37,6 @@ const ALL_36_SOURCES = [
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     },
     {
-        "id": "lx_62b61565",
-        "name": "[LX] 长青SVIP音源",
-        "platform": "kw",
-        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
-    },
-    {
         "id": "lx_0fa38726",
         "name": "[LX] 全豆要",
         "platform": "kw",
@@ -213,6 +207,12 @@ const ALL_36_SOURCES = [
     {
         "id": "lx_41f4c91d",
         "name": "[LX] xiaoqiu",
+        "platform": "kw",
+        "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
+    },
+    {
+        "id": "lx_53964f1a",
+        "name": "[LX] xiaowo",
         "platform": "kw",
         "testUrl": "http://music.nxinxz.com/kw.php?id=95769&level=standard&type=mp3"
     }
