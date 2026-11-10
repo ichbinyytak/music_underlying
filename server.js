@@ -14,6 +14,7 @@ import * as resolveApi from './api/resolve.js';
 import * as lyricApi from './api/lyric.js';
 import * as sourcesApi from './api/sources.js';
 import * as sourcesTestApi from './api/sources/test.js';
+import * as healthApi from './api/health.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +26,7 @@ const API_ROUTES = {
   '/api/lyric': lyricApi,
   '/api/sources': sourcesApi,
   '/api/sources/test': sourcesTestApi,
+  '/api/health': healthApi,
 };
 
 const MIME_TYPES = {
@@ -89,13 +91,11 @@ const server = http.createServer(async (req, res) => {
 
     const relPath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
     const candidate = path.resolve(__dirname, relPath);
+    const rel = path.relative(__dirname, candidate);
     const safeFile =
-      candidate.startsWith(__dirname + path.sep) &&
+      rel === 'index.html' &&
       fs.existsSync(candidate) &&
-      fs.statSync(candidate).isFile() &&
-      !relPath.startsWith('core/') &&
-      !relPath.startsWith('scripts/') &&
-      !relPath.startsWith('api/')
+      fs.statSync(candidate).isFile()
         ? candidate
         : path.join(__dirname, 'index.html');
 

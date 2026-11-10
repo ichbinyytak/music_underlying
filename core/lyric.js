@@ -6,6 +6,11 @@ import {
   decodeHtmlEntities,
   calculateSongMatchScore,
 } from './scoring.js';
+import {
+  fetchQqSearchRaw,
+  fetchKuwoSearchRaw,
+  fetchNeteaseSearchRaw,
+} from './search.js';
 
 const LYRIC_CACHE = new Map();
 const LYRIC_CACHE_MAX = 256;
@@ -192,27 +197,18 @@ export async function getSongLyric({ platform = 'kw', id = '', title = '', artis
   if (!q) return [];
 
   try {
-    const qqSearchUrl = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?p=1&n=5&w=${encodeURIComponent(
-      q
-    )}&format=json`;
-    const { res } = await safeFetch(qqSearchUrl, {
-      headers: { Referer: 'https://y.qq.com/', 'User-Agent': 'Mozilla/5.0' },
-      timeoutMs: 2500,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      for (const s of data?.data?.song?.list || []) {
-        const sname = decodeHtmlEntities(s.songname || '');
-        const sart = decodeHtmlEntities(
-          (s.singer || []).map((a) => a.name).filter(Boolean).join('/')
-        );
-        const { isMatch } = calculateSongMatchScore(sname, sart, '', cleanTitle, cleanArtist);
-        if (isMatch && s.songmid) {
-          const lines = await fetchQqLyricByMid(s.songmid);
-          if (lines.length > 0) {
-            setCachedLyric(cacheKey, lines);
-            return lines;
-          }
+    const list = await fetchQqSearchRaw(q, 5, 2500);
+    for (const s of list) {
+      const sname = decodeHtmlEntities(s.songname || '');
+      const sart = decodeHtmlEntities(
+        (s.singer || []).map((a) => a.name).filter(Boolean).join('/')
+      );
+      const { isMatch } = calculateSongMatchScore(sname, sart, '', cleanTitle, cleanArtist);
+      if (isMatch && s.songmid) {
+        const lines = await fetchQqLyricByMid(s.songmid);
+        if (lines.length > 0) {
+          setCachedLyric(cacheKey, lines);
+          return lines;
         }
       }
     }
@@ -221,26 +217,17 @@ export async function getSongLyric({ platform = 'kw', id = '', title = '', artis
   }
 
   try {
-    const kwSearchUrl = `https://search.kuwo.cn/r.s?client=kt&all=${encodeURIComponent(
-      q
-    )}&pn=0&rn=4&uid=794762528&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newsearch=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1`;
-    const { res } = await safeFetch(kwSearchUrl, {
-      headers: { 'User-Agent': 'okhttp/3.10.0' },
-      timeoutMs: 2200,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      for (const it of data?.abslist || []) {
-        const sname = decodeHtmlEntities(it.SONGNAME || '');
-        const sart = decodeHtmlEntities(it.ARTIST || '');
-        const rid = String(it.MUSICRID || '').replace('MUSIC_', '');
-        const { isMatch } = calculateSongMatchScore(sname, sart, '', cleanTitle, cleanArtist);
-        if (isMatch && /^\d+$/.test(rid)) {
-          const lines = await fetchKuwoLyricById(rid);
-          if (lines.length > 0) {
-            setCachedLyric(cacheKey, lines);
-            return lines;
-          }
+    const list = await fetchKuwoSearchRaw(q, 4, 2200);
+    for (const it of list) {
+      const sname = decodeHtmlEntities(it.SONGNAME || '');
+      const sart = decodeHtmlEntities(it.ARTIST || '');
+      const rid = String(it.MUSICRID || '').replace('MUSIC_', '');
+      const { isMatch } = calculateSongMatchScore(sname, sart, '', cleanTitle, cleanArtist);
+      if (isMatch && /^\d+$/.test(rid)) {
+        const lines = await fetchKuwoLyricById(rid);
+        if (lines.length > 0) {
+          setCachedLyric(cacheKey, lines);
+          return lines;
         }
       }
     }
@@ -249,27 +236,18 @@ export async function getSongLyric({ platform = 'kw', id = '', title = '', artis
   }
 
   try {
-    const neSearchUrl = `https://music.163.com/api/search/get?s=${encodeURIComponent(
-      q
-    )}&type=1&limit=4`;
-    const { res } = await safeFetch(neSearchUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' },
-      timeoutMs: 2500,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      for (const s of data?.result?.songs || []) {
-        const sname = decodeHtmlEntities(s.name || '');
-        const sart = decodeHtmlEntities(
-          (s.artists || []).map((a) => a.name).filter(Boolean).join('/')
-        );
-        const { isMatch } = calculateSongMatchScore(sname, sart, '', cleanTitle, cleanArtist);
-        if (isMatch && s.id) {
-          const lines = await fetchNeteaseLyricById(s.id);
-          if (lines.length > 0) {
-            setCachedLyric(cacheKey, lines);
-            return lines;
-          }
+    const songs = await fetchNeteaseSearchRaw(q, 4, 2500);
+    for (const s of songs) {
+      const sname = decodeHtmlEntities(s.name || '');
+      const sart = decodeHtmlEntities(
+        (s.artists || []).map((a) => a.name).filter(Boolean).join('/')
+      );
+      const { isMatch } = calculateSongMatchScore(sname, sart, '', cleanTitle, cleanArtist);
+      if (isMatch && s.id) {
+        const lines = await fetchNeteaseLyricById(s.id);
+        if (lines.length > 0) {
+          setCachedLyric(cacheKey, lines);
+          return lines;
         }
       }
     }

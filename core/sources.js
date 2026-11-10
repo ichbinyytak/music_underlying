@@ -334,6 +334,28 @@ export async function probeEndpoint(ep, songInfo, opts = {}) {
       return { ok: false, reason: `api_http_${res.status}`, latencyMs: Date.now() - t0 };
     }
 
+    const rawCt = (res.headers.get('content-type') || '').toLowerCase();
+    if (rawCt.startsWith('audio/') || rawCt === 'application/octet-stream') {
+      try {
+        await res.body?.cancel();
+      } catch {
+        // ignore
+      }
+      const vr = await verifyAudioStream(reqUrl, {
+        headers: {},
+        timeoutMs: Math.max(1200, timeoutMs - (Date.now() - t0) + 800),
+      });
+      return vr.ok
+        ? {
+            ok: true,
+            url: vr.finalUrl,
+            bytes: vr.bytes,
+            latencyMs: Date.now() - t0,
+            endpoint: ep,
+          }
+        : { ok: false, reason: vr.reason, latencyMs: Date.now() - t0 };
+    }
+
     const rawText = await res.text();
     let audioUrl = '';
 
@@ -367,18 +389,27 @@ export async function probeEndpoint(ep, songInfo, opts = {}) {
     }
 
     if (audioUrl && ep.urlPrefix && !audioUrl.startsWith('http')) {
-      audioUrl = ep.urlPrefix + audioUrl;
-    } else if (audioUrl && ep.urlPrefix && ep.urlPrefix.endsWith('/') && !audioUrl.startsWith('http')) {
-      audioUrl = ep.urlPrefix + audioUrl.replace(/^\/+/, '');
+      try {
+        audioUrl = new URL(audioUrl.replace(/^\/+/, ''), ep.urlPrefix).href;
+      } catch {
+        audioUrl = ep.urlPrefix + audioUrl;
+      }
     }
 
     if (!isPublicHttpUrl(audioUrl)) {
       return { ok: false, reason: 'no_audio_url', latencyMs: Date.now() - t0 };
     }
 
+    const cdnHeaders = {};
+    if (ep.headers) {
+      for (const [k, v] of Object.entries(ep.headers)) {
+        if (k.toLowerCase() !== 'content-type') cdnHeaders[k] = v;
+      }
+    }
+
     const remaining = Math.max(1200, timeoutMs - (Date.now() - t0) + 800);
     const vr = await verifyAudioStream(audioUrl, {
-      headers: ep.headers,
+      headers: cdnHeaders,
       timeoutMs: remaining,
     });
 

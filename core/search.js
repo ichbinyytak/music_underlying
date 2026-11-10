@@ -9,14 +9,64 @@ import {
 let mgFailStreak = 0;
 let mgLastFailAt = 0;
 
+function parseJsonSafe(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const m = /^[^(]*\(([\s\S]*)\)\s*;?$/.exec(String(rawText || '').trim());
+    if (m) return JSON.parse(m[1]);
+    throw new Error('Invalid JSON');
+  }
+}
+
+export async function fetchKuwoSearchRaw(q, limit = 6, timeoutMs = 4000) {
+  const url = `https://search.kuwo.cn/r.s?client=kt&all=${encodeURIComponent(
+    q
+  )}&pn=0&rn=${limit}&uid=794762528&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newsearch=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1`;
+  const { res } = await safeFetch(url, {
+    headers: { 'User-Agent': 'okhttp/3.10.0' },
+    timeoutMs,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data?.abslist || [];
+}
+
+export async function fetchNeteaseSearchRaw(q, limit = 6, timeoutMs = 4000) {
+  const url = `https://music.163.com/api/search/get?s=${encodeURIComponent(
+    q
+  )}&type=1&offset=0&limit=${limit}`;
+  const { res } = await safeFetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' },
+    timeoutMs,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data?.result?.songs || [];
+}
+
+export async function fetchQqSearchRaw(q, limit = 6, timeoutMs = 4000) {
+  const url = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?p=1&n=${limit}&w=${encodeURIComponent(
+    q
+  )}&format=json`;
+  const { res } = await safeFetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      Referer: 'https://y.qq.com/',
+    },
+    timeoutMs,
+  });
+  if (!res.ok) return [];
+  const data = parseJsonSafe(await res.text());
+  return data?.data?.song?.list || [];
+}
+
 function parseQueryIntent(q, explicitTitle, explicitArtist) {
   const simplifiedK = toSimple(cleanBrackets(q));
   let targetTitle = explicitTitle ? toSimple(cleanBrackets(explicitTitle)) : '';
   let targetArtist = explicitArtist ? toSimple(explicitArtist) : '';
 
-  if (targetTitle) {
-    // 保留显式传入的 title / artist
-  } else if (!targetArtist) {
+  if (!targetTitle && !targetArtist) {
     const parts = simplifiedK.split(/\s*[\-_/|]\s*|\s+/).filter(Boolean);
     if (parts.length >= 2) {
       targetTitle = parts.slice(0, -1).join(' ');
@@ -24,7 +74,7 @@ function parseQueryIntent(q, explicitTitle, explicitArtist) {
     } else {
       targetTitle = simplifiedK;
     }
-  } else {
+  } else if (!targetTitle) {
     targetTitle = simplifiedK;
   }
 
@@ -40,16 +90,7 @@ function parseQueryIntent(q, explicitTitle, explicitArtist) {
 async function searchKuwo(searchQ, targetTitle, targetArtist, limit, targetDuration) {
   const out = [];
   try {
-    const url = `https://search.kuwo.cn/r.s?client=kt&all=${encodeURIComponent(
-      searchQ
-    )}&pn=0&rn=${limit}&uid=794762528&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newsearch=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1`;
-    const { res } = await safeFetch(url, {
-      headers: { 'User-Agent': 'okhttp/3.10.0' },
-      timeoutMs: 4000,
-    });
-    if (!res.ok) return out;
-    const data = await res.json();
-    const list = data?.abslist || [];
+    const list = await fetchKuwoSearchRaw(searchQ, limit, 4000);
     for (let idx = 0; idx < list.length; idx++) {
       const it = list[idx];
       const sname = decodeHtmlEntities(it.SONGNAME || '');
@@ -90,16 +131,7 @@ async function searchKuwo(searchQ, targetTitle, targetArtist, limit, targetDurat
 async function searchNetease(searchQ, targetTitle, targetArtist, limit, targetDuration) {
   const out = [];
   try {
-    const url = `https://music.163.com/api/search/get?s=${encodeURIComponent(
-      searchQ
-    )}&type=1&offset=0&limit=${limit}`;
-    const { res } = await safeFetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' },
-      timeoutMs: 4000,
-    });
-    if (!res.ok) return out;
-    const data = await res.json();
-    const songs = data?.result?.songs || [];
+    const songs = await fetchNeteaseSearchRaw(searchQ, limit, 4000);
     for (let idx = 0; idx < songs.length; idx++) {
       const s = songs[idx];
       const sname = decodeHtmlEntities(s.name || '');
@@ -142,19 +174,7 @@ async function searchNetease(searchQ, targetTitle, targetArtist, limit, targetDu
 async function searchQQ(searchQ, targetTitle, targetArtist, limit, targetDuration) {
   const out = [];
   try {
-    const url = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?p=1&n=${limit}&w=${encodeURIComponent(
-      searchQ
-    )}&format=json`;
-    const { res } = await safeFetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        Referer: 'https://y.qq.com/',
-      },
-      timeoutMs: 4000,
-    });
-    if (!res.ok) return out;
-    const data = await res.json();
-    const list = data?.data?.song?.list || [];
+    const list = await fetchQqSearchRaw(searchQ, limit, 4000);
     for (let idx = 0; idx < list.length; idx++) {
       const s = list[idx];
       const sname = decodeHtmlEntities(s.songname || '');
