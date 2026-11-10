@@ -1,10 +1,9 @@
-name: Daily Sync Music Sources
+name: Daily Sync yy-lx-hub Sources
 
 on:
   schedule:
-    # 每天 UTC 20:00 (北京时间每天凌晨 04:00) 自动执行
-    - cron: '0 20 * * *'
-  # 支持在网页上一键手动测试
+    # 每天 UTC 21:00 (北京时间 05:00，在 yy-lx-hub 04:00 巡航完成之后) 自动同步
+    - cron: '0 21 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,17 +16,20 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 配置 Python
-        uses: actions/setup-python@v5
+      - name: 配置 Node.js 22
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '22'
 
-      - name: 运行同步
-        run: python3 sync_sources.py
+      - name: 从 yy-lx-hub 拉取并验签最新音源
+        env:
+          AMUSIC_SYNC_KEY: ${{ secrets.AMUSIC_SYNC_KEY }}
+          AMUSIC_SYNC_SECRET: ${{ secrets.AMUSIC_SYNC_SECRET }}
+        run: node scripts/sync.mjs
 
-      - name: 自动提交更新
+      - name: 自动提交更新（触发 Vercel 自动重新部署）
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add api/sources.js
-          git diff --staged --quiet || (git commit -m "chore(auto): 自动更新最新 36 音源清单 [skip ci]" && git push)
+          git add core/apis_bundle.js
+          git diff --staged --quiet || (git commit -m "chore(sync): 同步 yy-lx-hub 最新音源清单" && git push)

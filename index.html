@@ -3,80 +3,207 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YY-Music (极简三模块核心)</title>
+  <title>YY-Music Underlying Core · yy-lx-hub 驱动</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; color: #222; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-size: 13px; }
-    
-    /* 页面主骨架：左侧音源模块 + 右侧搜索模块 */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #fff;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
     .app-main { display: flex; flex: 1; min-height: 0; }
 
-    /* 模块 1：音源模块 (左侧栏) */
-    .module-sources { width: 230px; border-right: 1px solid #e0e0e0; background: #fbfbfb; display: flex; flex-direction: column; padding: 12px; gap: 8px; }
-    .module-sources .header { display: flex; justify-content: space-between; align-items: center; }
-    .module-sources h2 { font-size: 13px; color: #555; }
-    .module-sources button { padding: 2px 8px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
-    .source-list { list-style: none; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-    .source-item { display: flex; justify-content: space-between; padding: 5px 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; font-size: 11px; }
-    .source-item.top { border-color: #b7e1cd; background: #f6fbf7; font-weight: 500; }
-    .status-ok { color: #0f9d58; }
-    .status-fail { color: #d93025; }
+    /* 左侧：yy-lx-hub 真实音源面板 */
+    .module-sources {
+      width: 280px;
+      border-right: 1px solid #e0e0e0;
+      background: #fbfbfb;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 8px;
+    }
+    .module-sources .header { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .module-sources h2 { font-size: 13px; color: #333; }
+    .sync-meta { font-size: 11px; color: #888; }
+    .module-sources button {
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+    }
+    .module-sources button:disabled { opacity: 0.6; cursor: wait; }
 
-    /* 模块 2：搜索模块 (中央主体) */
+    .source-list { list-style: none; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+    .source-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .source-item.top { border-color: #b7e1cd; background: #f6fbf7; font-weight: 500; }
+    .source-item.fail { border-color: #fad2cf; background: #fef7f6; }
+    .source-name {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .plat-tag {
+      display: inline-block;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .plat-tx { background: #16a34a; }
+    .plat-wy { background: #dc2626; }
+    .plat-kw { background: #d97706; }
+    .plat-kg { background: #2563eb; }
+    .plat-mg { background: #db2777; }
+    .mode-tag {
+      font-size: 10px;
+      color: #666;
+      background: #f1f3f4;
+      padding: 0 3px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .status-ok { color: #0f9d58; font-family: monospace; flex-shrink: 0; }
+    .status-fail { color: #d93025; font-size: 10px; flex-shrink: 0; }
+    .status-wait { color: #888; font-size: 10px; flex-shrink: 0; }
+
+    /* 中央：五平台聚合搜索 */
     .module-search { flex: 1; display: flex; flex-direction: column; padding: 16px 20px; min-width: 0; gap: 12px; }
-    .search-bar { display: flex; gap: 8px; max-width: 600px; width: 100%; }
-    .search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; outline: none; font-size: 14px; }
-    .search-bar button { padding: 8px 16px; border: 1px solid #1a73e8; background: #1a73e8; color: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+    .search-bar { display: flex; gap: 8px; max-width: 660px; width: 100%; }
+    .search-bar input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      outline: none;
+      font-size: 14px;
+    }
+    .search-bar button {
+      padding: 8px 16px;
+      border: 1px solid #1a73e8;
+      background: #1a73e8;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
     .search-bar .btn-secondary { background: #fff; color: #333; border-color: #ccc; }
-    
+
     .table-container { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; }
     table { width: 100%; border-collapse: collapse; text-align: left; }
     th, td { padding: 8px 12px; border-bottom: 1px solid #eee; }
-    th { background: #fafafa; color: #666; font-weight: 500; font-size: 12px; position: sticky; top: 0; }
+    th { background: #fafafa; color: #666; font-weight: 500; font-size: 12px; position: sticky; top: 0; z-index: 1; }
     tr:hover { background: #f8f9fa; }
     tr.playing { background: #e8f0fe; font-weight: 500; }
-    .play-action { padding: 3px 10px; font-size: 11px; border: 1px solid #1a73e8; background: #fff; color: #1a73e8; border-radius: 12px; cursor: pointer; }
+    .play-action {
+      padding: 3px 10px;
+      font-size: 11px;
+      border: 1px solid #1a73e8;
+      background: #fff;
+      color: #1a73e8;
+      border-radius: 12px;
+      cursor: pointer;
+    }
     .badge { font-size: 10px; background: #e6f4ea; color: #137333; padding: 2px 6px; border-radius: 8px; }
 
-    /* 模块 3：播放模块 (底部栏) */
-    .module-player { border-top: 1px solid #e0e0e0; background: #fff; display: flex; flex-direction: column; padding: 6px 16px 10px 16px; gap: 6px; }
+    /* 底部播放栏 */
+    .module-player {
+      border-top: 1px solid #e0e0e0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 16px 10px 16px;
+      gap: 6px;
+    }
     .progress-bar { width: 100%; height: 5px; background: #e0e0e0; border-radius: 3px; cursor: pointer; }
     .progress-fill { width: 0%; height: 100%; background: #1a73e8; border-radius: 3px; }
-    
     .player-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .track-cell { width: 220px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .track-cell { width: 280px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .track-cell strong { font-size: 13px; color: #111; }
-    .track-cell small { display: block; color: #1e8e3e; font-size: 11px; font-family: monospace; }
-    
-    .lyric-cell { flex: 1; text-align: center; color: #1a73e8; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
-    
+    .track-cell small { display: block; color: #1e8e3e; font-size: 11px; font-family: monospace; overflow: hidden; text-overflow: ellipsis; }
+    .track-cell small.err { color: #d93025; }
+    .lyric-cell {
+      flex: 1;
+      text-align: center;
+      color: #1a73e8;
+      font-weight: 600;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0 10px;
+    }
     .controls-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
     .time-txt { font-size: 11px; color: #777; font-family: monospace; }
-    .controls-cell button { width: 32px; height: 32px; border: 1px solid #ccc; background: #fff; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .controls-cell button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
     .controls-cell button.btn-main { background: #1a73e8; color: #fff; border-color: #1a73e8; font-size: 14px; width: 36px; height: 36px; }
     .controls-cell button.btn-mode { width: auto; border-radius: 12px; padding: 0 8px; font-size: 11px; }
+
+    @media (max-width: 768px) {
+      .app-main { flex-direction: column; }
+      .module-sources { width: 100%; max-height: 170px; border-right: none; border-bottom: 1px solid #e0e0e0; }
+      .track-cell { width: 150px; }
+    }
   </style>
 </head>
 <body>
-
-  <!-- 主体工作区 -->
   <div class="app-main">
-    
-    <!-- 1. 音源模块 (左侧) -->
     <aside class="module-sources">
       <div class="header">
-        <h2>音源模块 (36源)</h2>
-        <button id="btnSpeed" onclick="speedTest()">⚡测速重排</button>
+        <h2 id="sourcesTitle">音源模块 (加载中)</h2>
+        <button id="btnSpeed" onclick="speedTest()">⚡ 实测重排</button>
       </div>
+      <div class="sync-meta" id="syncMeta">正在读取 yy-lx-hub 清单...</div>
       <ul class="source-list" id="sourceList">
         <li style="color:#888;padding:10px 0;">加载音源中...</li>
       </ul>
     </aside>
 
-    <!-- 2. 搜索模块 (主体) -->
     <main class="module-search">
       <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="输入歌名/歌手（支持繁简、错字，如：海阔天空 Beyond）" value="海阔天空 Beyond" onkeydown="if(event.key==='Enter') search()">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="输入歌名/歌手（五平台并发搜索：晴天 周杰伦）"
+          value="晴天 周杰伦"
+          onkeydown="if(event.key==='Enter') search()"
+        >
         <button id="btnSearch" onclick="search()">搜索</button>
         <button class="btn-secondary" onclick="showDefaultPlaylist()">默认歌单</button>
       </div>
@@ -86,11 +213,13 @@
           <thead>
             <tr>
               <th style="width:40px;">#</th>
+              <th style="width:58px;">平台</th>
               <th>歌名</th>
               <th>歌手</th>
-              <th>时长</th>
-              <th>正版度</th>
-              <th style="width:70px;">操作</th>
+              <th>专辑</th>
+              <th style="width:65px;">时长</th>
+              <th style="width:72px;">匹配度</th>
+              <th style="width:65px;">操作</th>
             </tr>
           </thead>
           <tbody id="songList"></tbody>
@@ -99,413 +228,46 @@
     </main>
   </div>
 
-  <!-- 3. 播放模块 (底栏) -->
   <footer class="module-player">
     <div class="progress-bar" onclick="seek(event)">
       <div class="progress-fill" id="progressFill"></div>
     </div>
-    
     <div class="player-row">
-      <!-- 歌曲信息与胜出音源 -->
       <div class="track-cell">
         <strong id="trackTitle">未播放</strong>
-        <small id="trackMeta">就绪</small>
+        <small id="trackMeta">就绪 · yy-lx-hub 引擎</small>
       </div>
-
-      <!-- 实时歌词中心 -->
-      <div class="lyric-cell" id="lyricText">♪ YY-Music 极简底层 ♪</div>
-
-      <!-- 播控按键 -->
+      <div class="lyric-cell" id="lyricText">♪ YY-Music Underlying Core ♪</div>
       <div class="controls-cell">
         <span class="time-txt" id="timeTxt">00:00 / 00:00</span>
-        <button class="btn-mode" id="btnMode" title="播放模式" onclick="toggleMode()">🔁 循环</button>
-        <button title="上一曲" onclick="player.prev()">⏮</button>
-        <button class="btn-main" id="btnPlay" title="播放/暂停" onclick="player.togglePlay()">▶</button>
-        <button title="下一曲" onclick="player.next()">⏭</button>
+        <button onclick="player.prev()" title="上一曲">⏮</button>
+        <button id="btnPlay" class="btn-main" onclick="player.togglePlay()" title="播放/暂停">▶</button>
+        <button onclick="player.next()" title="下一曲">⏭</button>
+        <button id="btnMode" class="btn-mode" onclick="toggleMode()" title="切换循环模式">🔁 列表</button>
       </div>
     </div>
   </footer>
 
-  <!-- 引入独立播放模块 -->
-    <script>
-/**
- * player.js - 独立音乐播放模块
- * 包含：
- * 1. 默认精选歌单与播放队列管理 (PlaylistManager)
- * 2. 播控状态机 (PlaybackController: 播放/暂停/上一曲/下一曲/循环模式/进度拖拽)
- * 3. 毫秒级歌词同步引擎 (LyricEngine: LRC时间轴对齐、当前句高亮与下一句预告)
- */
-
-(function (window) {
-  'use strict';
-
-  // 1. 默认精选正版歌单 (页面初始化直接开箱即用)
-  const DEFAULT_PLAYLIST = [
-    {
-      platform: "kw",
-      id: "332301462",
-      title: "海阔天空 (Edit)",
-      artist: "BEYOND",
-      album: "Beyond 20th Anniversary",
-      duration: 239,
-      score: 90.0
-    },
-    {
-      platform: "kw",
-      id: "254426",
-      title: "晴天",
-      artist: "周杰伦",
-      album: "叶惠美",
-      duration: 269,
-      score: 90.0
-    },
-    {
-      platform: "kw",
-      id: "5046200",
-      title: "平凡之路",
-      artist: "朴树",
-      album: "平凡之路",
-      duration: 301,
-      score: 90.0
-    },
-    {
-      platform: "kw",
-      id: "345094",
-      title: "夜空中最亮的星",
-      artist: "逃跑计划",
-      album: "世界",
-      duration: 252,
-      score: 90.0
-    },
-    {
-      platform: "kw",
-      id: "255280",
-      title: "十年",
-      artist: "陈奕迅",
-      album: "黑·白·灰",
-      duration: 205,
-      score: 90.0
-    }
-  ];
-
-  // 格式化秒数为 mm:ss
-  function formatTime(sec) {
-    if (!sec || isNaN(sec)) return "00:00";
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-  }
-
-  class MusicPlayer {
-    constructor() {
-      // 核心 HTML5 Audio 实例
-      this.audio = new Audio();
-      this.audio.preload = "auto";
-
-      // 歌单状态
-      this.playlist = [...DEFAULT_PLAYLIST];
-      this.currentIndex = 0;
-      this.isDefaultList = true;
-
-      // 播放模式: 'loop' (列表循环) | 'single' (单曲循环) | 'shuffle' (随机播放)
-      this.playMode = 'loop';
-
-      // 状态标志
-      this.isResolving = false;
-      this.isPlaying = false;
-
-      // 歌词状态
-      this.lyrics = [];
-      this.currentLyricIdx = -1;
-
-      // 回调钩子 (用于更新 UI)
-      this.listeners = {
-        trackChange: [],
-        stateChange: [],
-        timeUpdate: [],
-        lyricUpdate: [],
-        playlistChange: []
-      };
-
-      this._bindAudioEvents();
-    }
-
-    // 绑定底层音频事件
-    _bindAudioEvents() {
-      this.audio.addEventListener('play', () => {
-        this.isPlaying = true;
-        this._emit('stateChange', { isPlaying: true, isResolving: this.isResolving });
-      });
-
-      this.audio.addEventListener('pause', () => {
-        this.isPlaying = false;
-        this._emit('stateChange', { isPlaying: false, isResolving: this.isResolving });
-      });
-
-      this.audio.addEventListener('timeupdate', () => {
-        const cur = this.audio.currentTime || 0;
-        const dur = this.audio.duration || 0;
-        const pct = dur > 0 ? (cur / dur) * 100 : 0;
-        this._emit('timeUpdate', {
-          currentTime: cur,
-          duration: dur,
-          percent: pct,
-          formattedCurrent: formatTime(cur),
-          formattedDuration: formatTime(dur)
-        });
-
-        this._syncLyrics(cur);
-      });
-
-      this.audio.addEventListener('ended', () => {
-        this._handleTrackEnded();
-      });
-
-      this.audio.addEventListener('error', (e) => {
-        console.warn("音频播放异常:", e);
-        this._emit('stateChange', { isPlaying: false, isResolving: false, error: "音频流加载异常" });
-      });
-    }
-
-    // 歌轨自然结束时的处理
-    _handleTrackEnded() {
-      if (this.playMode === 'single') {
-        this.audio.currentTime = 0;
-        this.audio.play().catch(() => {});
-      } else if (this.playMode === 'shuffle') {
-        const nextIdx = Math.floor(Math.random() * this.playlist.length);
-        this.playIndex(nextIdx);
-      } else {
-        // 默认列表循环
-        this.next();
-      }
-    }
-
-    // 毫秒级歌词同步
-    _syncLyrics(currentTime) {
-      if (!this.lyrics || this.lyrics.length === 0) return;
-
-      let idx = -1;
-      for (let i = 0; i < this.lyrics.length; i++) {
-        if (currentTime >= this.lyrics[i].time) {
-          idx = i;
-        } else {
-          break;
-        }
-      }
-
-      if (idx !== this.currentLyricIdx) {
-        this.currentLyricIdx = idx;
-        const currentLine = idx >= 0 ? this.lyrics[idx].text : "";
-        const nextLine = (idx + 1 < this.lyrics.length) ? this.lyrics[idx + 1].text : "";
-        this._emit('lyricUpdate', {
-          index: idx,
-          currentLine,
-          nextLine,
-          allLines: this.lyrics
-        });
-      }
-    }
-
-    // 获取当前歌词
-    async fetchLyrics(song) {
-      this.lyrics = [];
-      this.currentLyricIdx = -1;
-      this._emit('lyricUpdate', { index: -1, currentLine: "正在匹配歌词...", nextLine: "", allLines: [] });
-
-      try {
-        const plat = encodeURIComponent(song.platform || 'kw');
-        const sid = encodeURIComponent(song.id || '');
-        const title = encodeURIComponent(song.title || '');
-        const artist = encodeURIComponent(song.artist || '');
-        const res = await fetch(`/api/lyric?platform=${plat}&id=${sid}&title=${title}&artist=${artist}`);
-        const lines = await res.json();
-        this.lyrics = lines || [];
-        if (this.lyrics.length === 0) {
-          this._emit('lyricUpdate', { index: -1, currentLine: "纯音乐，请欣赏", nextLine: "", allLines: [] });
-        } else {
-          this._syncLyrics(this.audio.currentTime || 0);
-        }
-      } catch (e) {
-        this.lyrics = [];
-        this._emit('lyricUpdate', { index: -1, currentLine: "暂无歌词", nextLine: "", allLines: [] });
-      }
-    }
-
-    // 播放指定索引的曲目
-    async playIndex(idx) {
-      if (idx < 0 || idx >= this.playlist.length) return;
-      if (this.isResolving) return;
-
-      this.currentIndex = idx;
-      const song = this.playlist[idx];
-      this.isResolving = true;
-
-      this._emit('trackChange', { index: idx, song });
-      this._emit('stateChange', { isPlaying: false, isResolving: true, song });
-
-      // 并行请求歌词
-      this.fetchLyrics(song);
-
-      try {
-        const t0 = performance.now();
-        const res = await fetch('/api/resolve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(song)
-        });
-        const data = await res.json();
-        const cost = (performance.now() - t0).toFixed(0);
-
-        if (data.success && data.url) {
-          this.audio.src = data.url;
-          this.audio.play().catch(e => console.warn("自动出声受阻:", e));
-          this._emit('stateChange', {
-            isPlaying: true,
-            isResolving: false,
-            song,
-            sourceName: data.source_name,
-            costMs: cost,
-            bytes: data.bytes
-          });
-        } else {
-          this._emit('stateChange', {
-            isPlaying: false,
-            isResolving: false,
-            song,
-            error: data.error || "所有音源轮询均未通过校验"
-          });
-        }
-      } catch (err) {
-        this._emit('stateChange', {
-          isPlaying: false,
-          isResolving: false,
-          song,
-          error: "网络错误: " + err.message
-        });
-      } finally {
-        this.isResolving = false;
-      }
-    }
-
-    // 播控方法
-    togglePlay() {
-      if (!this.audio.src) {
-        if (this.playlist.length > 0) {
-          this.playIndex(this.currentIndex >= 0 ? this.currentIndex : 0);
-        }
-        return;
-      }
-
-      if (this.audio.paused) {
-        this.audio.play().catch(() => {});
-      } else {
-        this.audio.pause();
-      }
-    }
-
-    next() {
-      if (this.playlist.length === 0) return;
-      if (this.playMode === 'shuffle') {
-        const nextIdx = Math.floor(Math.random() * this.playlist.length);
-        this.playIndex(nextIdx);
-      } else {
-        const nextIdx = (this.currentIndex + 1) % this.playlist.length;
-        this.playIndex(nextIdx);
-      }
-    }
-
-    prev() {
-      if (this.playlist.length === 0) return;
-      let prevIdx = this.currentIndex - 1;
-      if (prevIdx < 0) prevIdx = this.playlist.length - 1;
-      this.playIndex(prevIdx);
-    }
-
-    seek(percent) {
-      if (!this.audio.duration) return;
-      const pct = Math.max(0, Math.min(1, percent));
-      this.audio.currentTime = pct * this.audio.duration;
-    }
-
-    // 切换循环模式
-    cycleMode() {
-      if (this.playMode === 'loop') {
-        this.playMode = 'single';
-      } else if (this.playMode === 'single') {
-        this.playMode = 'shuffle';
-      } else {
-        this.playMode = 'loop';
-      }
-      return this.playMode;
-    }
-
-    getModeLabel() {
-      if (this.playMode === 'loop') return { mode: 'loop', icon: '🔁', label: '列表循环' };
-      if (this.playMode === 'single') return { mode: 'single', icon: '🔂', label: '单曲循环' };
-      return { mode: 'shuffle', icon: '🔀', label: '随机播放' };
-    }
-
-    // 替换/设置当前播放列表（如搜索结果直接成为当前列表）
-    setPlaylist(newList, autoPlayIndex = -1) {
-      if (!Array.isArray(newList)) return;
-      this.playlist = [...newList];
-      this.isDefaultList = false;
-      this._emit('playlistChange', { playlist: this.playlist, isDefault: false });
-
-      if (autoPlayIndex >= 0 && autoPlayIndex < this.playlist.length) {
-        this.playIndex(autoPlayIndex);
-      }
-    }
-
-    // 插入并立即播放一首歌
-    insertAndPlay(song) {
-      const existingIdx = this.playlist.findIndex(s => s.platform === song.platform && s.id === song.id);
-      if (existingIdx >= 0) {
-        this.playIndex(existingIdx);
-      } else {
-        this.playlist.splice(this.currentIndex + 1, 0, song);
-        this._emit('playlistChange', { playlist: this.playlist, isDefault: false });
-        this.playIndex(this.currentIndex + 1);
-      }
-    }
-
-    // 重置回默认精选歌单
-    loadDefaultPlaylist() {
-      this.playlist = [...DEFAULT_PLAYLIST];
-      this.isDefaultList = true;
-      this.currentIndex = 0;
-      this._emit('playlistChange', { playlist: this.playlist, isDefault: true });
-    }
-
-    // 事件监听与派发
-    on(event, callback) {
-      if (this.listeners[event]) {
-        this.listeners[event].push(callback);
-      }
-    }
-
-    _emit(event, data) {
-      if (this.listeners[event]) {
-        this.listeners[event].forEach(cb => {
-          try { cb(data); } catch (e) { console.error(e); }
-        });
-      }
-    }
-  }
-
-  // 挂载到全局
-  window.MusicPlayer = MusicPlayer;
-
-})(window);
-
-  </script>
-
+  <script src="/player.js"></script>
   <script>
-    // 初始化播放模块
     const player = new MusicPlayer();
 
-    // 格式化时间
+    const PLAT_LABELS = {
+      tx: { text: 'QQ', cls: 'plat-tx' },
+      wy: { text: '网易', cls: 'plat-wy' },
+      kw: { text: '酷我', cls: 'plat-kw' },
+      kg: { text: '酷狗', cls: 'plat-kg' },
+      mg: { text: '咪咕', cls: 'plat-mg' },
+    };
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     function formatTime(sec) {
       if (!sec || isNaN(sec)) return '--:--';
       const m = Math.floor(sec / 60);
@@ -513,78 +275,113 @@
       return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
-    // ==========================================
-    // 1. 音源模块交互
-    // ==========================================
+    function renderPlatTag(plat) {
+      const meta = PLAT_LABELS[plat] || { text: (plat || '?').toUpperCase(), cls: 'plat-kw' };
+      return `<span class="plat-tag ${meta.cls}">${escapeHtml(meta.text)}</span>`;
+    }
+
     async function loadSources() {
       try {
         const res = await fetch('/api/sources');
         const list = await res.json();
-        renderSources(list);
-      } catch (e) {
-        document.getElementById('sourceList').innerHTML = 
-          '<li style="color:#d93025;padding:8px 0;">音源加载失败 <button onclick="loadSources()" style="padding:1px 4px;font-size:10px;">重试</button></li>';
+        renderSources(list, res.headers.get('X-Hub-Updated-At'));
+      } catch {
+        document.getElementById('sourceList').innerHTML =
+          '<li style="color:#d93025;padding:8px 0;">音源加载失败 <button onclick="loadSources()">重试</button></li>';
       }
     }
 
     async function speedTest() {
       const btn = document.getElementById('btnSpeed');
-      btn.innerText = "测速中...";
+      btn.innerText = '实测中...';
       btn.disabled = true;
       try {
         const res = await fetch('/api/sources/test', { method: 'POST' });
-        renderSources(await res.json());
+        const list = await res.json();
+        renderSources(list, res.headers.get('X-Hub-Updated-At'));
       } catch (e) {
-        alert("测速异常: " + e.message);
+        alert('测速异常: ' + e.message);
       } finally {
-        btn.innerText = "⚡测速重排";
+        btn.innerText = '⚡ 实测重排';
         btn.disabled = false;
       }
     }
 
-    function renderSources(sources) {
+    function renderSources(sources, headerUpdatedAt) {
       const ul = document.getElementById('sourceList');
+      const titleEl = document.getElementById('sourcesTitle');
+      const metaEl = document.getElementById('syncMeta');
+
       if (!Array.isArray(sources) || sources.length === 0) {
+        titleEl.innerText = '音源模块 (0 源)';
+        metaEl.innerText = '暂无可用音源，请先运行同步脚本';
         ul.innerHTML = '<li style="color:#888;padding:8px 0;">暂无音源</li>';
         return;
       }
-      ul.innerHTML = sources.map((s, idx) => {
-        const isOk = (s.status === 'ok' || s.status === 'active' || s.status === 'healthy');
-        let statusClass = 'status-fail';
-        let statusTxt = '×';
-        if (isOk) {
-          statusClass = 'status-ok';
-          statusTxt = (typeof s.latency_ms === 'number' && !isNaN(s.latency_ms)) ? Math.round(s.latency_ms) + 'ms' : '●';
-        } else if (s.status === 'untested') {
-          statusClass = '';
-          statusTxt = '○';
-        }
-        return `
-          <li class="source-item ${idx < 2 && isOk ? 'top' : ''}">
-            <span title="${s.name || ''}">${idx + 1}. ${s.name || '未知音源'}</span>
-            <span class="${statusClass}">${statusTxt}</span>
-          </li>
-        `;
-      }).join('');
+
+      const okCount = sources.filter((s) => s.status === 'ok').length;
+      titleEl.innerText = `音源模块 (${okCount > 0 ? okCount + '/' : ''}${sources.length} 源)`;
+      const updated = headerUpdatedAt || sources[0]?.updated_at;
+      if (updated) {
+        const d = new Date(updated);
+        metaEl.innerText = isNaN(d.getTime())
+          ? `yy-lx-hub: ${updated}`
+          : `yy-lx-hub 同步: ${d.toLocaleString('zh-CN', { hour12: false })}`;
+      }
+
+      ul.innerHTML = sources
+        .map((s, idx) => {
+          let statusClass = 'status-wait';
+          let statusTxt = s.sample_latency_ms ? `~${s.sample_latency_ms}ms` : '待测';
+          let itemCls = '';
+
+          if (s.status === 'ok') {
+            statusClass = 'status-ok';
+            statusTxt =
+              typeof s.latency_ms === 'number' && !isNaN(s.latency_ms)
+                ? `${Math.round(s.latency_ms)}ms`
+                : '正常';
+            if (idx < 3) itemCls = 'top';
+          } else if (s.status === 'fail') {
+            statusClass = 'status-fail';
+            statusTxt = '× 失效';
+            itemCls = 'fail';
+          }
+
+          const modeBadge =
+            s.matchMode === 'search'
+              ? '<span class="mode-tag" title="按歌名搜索匹配">搜</span>'
+              : '<span class="mode-tag" title="按平台 ID 精准解析">ID</span>';
+          const titleAttr = escapeHtml(
+            `${s.name || ''}${s.error ? ' | 错误: ' + s.error : ''}`
+          );
+
+          return `
+            <li class="source-item ${itemCls}" title="${titleAttr}">
+              <span class="source-name">
+                ${renderPlatTag(s.platform)}
+                ${modeBadge}
+                <span>${escapeHtml(s.name || '未命名音源')}</span>
+              </span>
+              <span class="${statusClass}">${statusTxt}</span>
+            </li>
+          `;
+        })
+        .join('');
     }
 
-    // ==========================================
-    // 2. 搜索模块交互
-    // ==========================================
     async function search() {
       const q = document.getElementById('searchInput').value.trim();
       if (!q) return;
-
       const btn = document.getElementById('btnSearch');
-      btn.innerText = "搜索中...";
+      btn.innerText = '搜索中...';
       btn.disabled = true;
-
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         const cands = await res.json();
         player.setPlaylist(cands, -1);
       } finally {
-        btn.innerText = "搜索";
+        btn.innerText = '搜索';
         btn.disabled = false;
       }
     }
@@ -596,33 +393,35 @@
     function renderSongTable(songs) {
       const tbody = document.getElementById('songList');
       if (!songs || songs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#888;">未搜到正版歌曲（已自动拦截翻唱/伴奏）</td></tr>';
+        tbody.innerHTML =
+          '<tr><td colspan="8" style="text-align:center;padding:30px;color:#888;">未搜到正版歌曲（已自动过滤翻唱/伴奏）</td></tr>';
         return;
       }
 
-      tbody.innerHTML = songs.map((s, idx) => {
-        const isCur = (idx === player.currentIndex);
-        let btnText = "▶";
-        if (isCur) {
-          if (player.isResolving) btnText = "...";
-          else if (player.isPlaying) btnText = "⏸";
-        }
-        return `
-          <tr class="${isCur ? 'playing' : ''}">
-            <td>${idx + 1}</td>
-            <td><strong>${s.title}</strong></td>
-            <td>${s.artist}</td>
-            <td>${formatTime(s.duration)}</td>
-            <td><span class="badge">🎯 ${s.score || 90}分</span></td>
-            <td><button class="play-action" onclick="player.playIndex(${idx})">${btnText}</button></td>
-          </tr>
-        `;
-      }).join('');
+      tbody.innerHTML = songs
+        .map((s, idx) => {
+          const isCur = idx === player.currentIndex;
+          let btnText = '▶';
+          if (isCur) {
+            if (player.isResolving) btnText = '...';
+            else if (player.isPlaying) btnText = '⏸';
+          }
+          return `
+            <tr class="${isCur ? 'playing' : ''}">
+              <td>${idx + 1}</td>
+              <td>${renderPlatTag(s.platform)}</td>
+              <td><strong>${escapeHtml(s.title)}</strong></td>
+              <td>${escapeHtml(s.artist)}</td>
+              <td>${escapeHtml(s.album || '-')}</td>
+              <td>${formatTime(s.duration)}</td>
+              <td><span class="badge">${s.score || 90}分</span></td>
+              <td><button class="play-action" onclick="player.playIndex(${idx})">${btnText}</button></td>
+            </tr>
+          `;
+        })
+        .join('');
     }
 
-    // ==========================================
-    // 3. 播放模块事件绑定与 UI 同步
-    // ==========================================
     player.on('playlistChange', () => renderSongTable(player.playlist));
 
     player.on('trackChange', ({ song }) => {
@@ -632,13 +431,18 @@
 
     player.on('stateChange', (st) => {
       document.getElementById('btnPlay').innerText = st.isPlaying ? '⏸' : '▶';
+      const metaEl = document.getElementById('trackMeta');
       if (st.isResolving) {
-        document.getElementById('trackMeta').innerText = '双核竞速寻链中...';
+        metaEl.className = '';
+        metaEl.innerText = '多通道并发竞速寻链中...';
       } else if (st.sourceName) {
-        const mb = (st.bytes / (1024 * 1024)).toFixed(2);
-        document.getElementById('trackMeta').innerText = `✓ ${st.sourceName} | ${st.costMs}ms | ${mb}MB`;
+        metaEl.className = '';
+        const mb = ((st.bytes || 0) / (1024 * 1024)).toFixed(2);
+        const fb = st.fallbackFrom ? ` (跨平台兜底:${st.fallbackFrom}->${st.resolvedPlatform})` : '';
+        metaEl.innerText = `✓ ${st.sourceName} | ${st.costMs}ms | ${mb}MB${fb}`;
       } else if (st.error) {
-        document.getElementById('trackMeta').innerText = `× ${st.error}`;
+        metaEl.className = 'err';
+        metaEl.innerText = `× ${st.error}`;
       }
       renderSongTable(player.playlist);
     });
@@ -663,7 +467,6 @@
       player.seek((event.clientX - rect.left) / rect.width);
     }
 
-    // 初始化运行
     window.addEventListener('DOMContentLoaded', () => {
       loadSources();
       renderSongTable(player.playlist);

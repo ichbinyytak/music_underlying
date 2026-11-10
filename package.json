@@ -1,9 +1,13 @@
 {
   "name": "music-underlying",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "YY-Music Minimalist Universal Core (Cloudflare Pages + Standard Node.js)",
+  "description": "YY-Music Underlying Core powered by yy-lx-hub (Vercel Serverless + Node.js)",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "sync": "node scripts/sync.mjs"
   }
 }

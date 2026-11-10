@@ -1,66 +1,68 @@
 /**
  * player.js - 独立音乐播放模块
  * 包含：
- * 1. 默认精选歌单与播放队列管理 (PlaylistManager)
- * 2. 播控状态机 (PlaybackController: 播放/暂停/上一曲/下一曲/循环模式/进度拖拽)
- * 3. 毫秒级歌词同步引擎 (LyricEngine: LRC时间轴对齐、当前句高亮与下一句预告)
+ * 1. 默认精选歌单与播放队列管理
+ * 2. 播控状态机（竞态 token 防串歌 + 播放/暂停/切歌/循环模式/进度拖拽）
+ * 3. 毫秒级歌词同步引擎
  */
-
 (function (window) {
   'use strict';
 
-  // 1. 默认精选正版歌单 (页面初始化直接开箱即用)
   const DEFAULT_PLAYLIST = [
     {
-      platform: "kw",
-      id: "332301462",
-      title: "海阔天空 (Edit)",
-      artist: "BEYOND",
-      album: "Beyond 20th Anniversary",
-      duration: 239,
-      score: 90.0
-    },
-    {
-      platform: "kw",
-      id: "254426",
-      title: "晴天",
-      artist: "周杰伦",
-      album: "叶惠美",
+      platform: 'tx',
+      id: '0039MnYb0qxYhV',
+      songmid: '0039MnYb0qxYhV',
+      title: '晴天',
+      artist: '周杰伦',
+      album: '叶惠美',
       duration: 269,
-      score: 90.0
+      score: 100.0,
     },
     {
-      platform: "kw",
-      id: "5046200",
-      title: "平凡之路",
-      artist: "朴树",
-      album: "平凡之路",
+      platform: 'kw',
+      id: '5886682',
+      songmid: '5886682',
+      title: '海阔天空',
+      artist: 'Beyond',
+      album: '乐与怒',
+      duration: 326,
+      score: 100.0,
+    },
+    {
+      platform: 'wy',
+      id: '347230',
+      songmid: '347230',
+      title: '海阔天空',
+      artist: 'Beyond',
+      album: '乐与怒',
+      duration: 326,
+      score: 100.0,
+    },
+    {
+      platform: 'kw',
+      id: '5046200',
+      songmid: '5046200',
+      title: '平凡之路',
+      artist: '朴树',
+      album: '猎户星座',
       duration: 301,
-      score: 90.0
+      score: 95.0,
     },
     {
-      platform: "kw",
-      id: "345094",
-      title: "夜空中最亮的星",
-      artist: "逃跑计划",
-      album: "世界",
-      duration: 252,
-      score: 90.0
-    },
-    {
-      platform: "kw",
-      id: "255280",
-      title: "十年",
-      artist: "陈奕迅",
-      album: "黑·白·灰",
+      platform: 'kw',
+      id: '255280',
+      songmid: '255280',
+      title: '十年',
+      artist: '陈奕迅',
+      album: '黑·白·灰',
       duration: 205,
-      score: 90.0
-    }
+      score: 95.0,
+    },
   ];
 
-  // 格式化秒数为 mm:ss
   function formatTime(sec) {
-    if (!sec || isNaN(sec)) return "00:00";
+    if (!sec || isNaN(sec)) return '00:00';
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
@@ -68,39 +70,33 @@
 
   class MusicPlayer {
     constructor() {
-      // 核心 HTML5 Audio 实例
       this.audio = new Audio();
-      this.audio.preload = "auto";
+      this.audio.preload = 'auto';
 
-      // 歌单状态
       this.playlist = [...DEFAULT_PLAYLIST];
-      this.currentIndex = 0;
+      this.currentIndex = -1;
       this.isDefaultList = true;
+      this.playMode = 'loop'; // 'loop' | 'single' | 'shuffle'
 
-      // 播放模式: 'loop' (列表循环) | 'single' (单曲循环) | 'shuffle' (随机播放)
-      this.playMode = 'loop';
-
-      // 状态标志
       this.isResolving = false;
       this.isPlaying = false;
+      this._playToken = 0;
+      this._abortCtrl = null;
 
-      // 歌词状态
       this.lyrics = [];
       this.currentLyricIdx = -1;
 
-      // 回调钩子 (用于更新 UI)
       this.listeners = {
         trackChange: [],
         stateChange: [],
         timeUpdate: [],
         lyricUpdate: [],
-        playlistChange: []
+        playlistChange: [],
       };
 
       this._bindAudioEvents();
     }
 
-    // 绑定底层音频事件
     _bindAudioEvents() {
       this.audio.addEventListener('play', () => {
         this.isPlaying = true;
@@ -121,9 +117,8 @@
           duration: dur,
           percent: pct,
           formattedCurrent: formatTime(cur),
-          formattedDuration: formatTime(dur)
+          formattedDuration: formatTime(dur),
         });
-
         this._syncLyrics(cur);
       });
 
@@ -131,27 +126,25 @@
         this._handleTrackEnded();
       });
 
-      this.audio.addEventListener('error', (e) => {
-        console.warn("音频播放异常:", e);
-        this._emit('stateChange', { isPlaying: false, isResolving: false, error: "音频流加载异常" });
+      this.audio.addEventListener('error', () => {
+        this.isPlaying = false;
+        this._emit('stateChange', {
+          isPlaying: false,
+          isResolving: false,
+          error: '音频流加载失败（可能受防盗链或网络波动影响）',
+        });
       });
     }
 
-    // 歌轨自然结束时的处理
     _handleTrackEnded() {
       if (this.playMode === 'single') {
         this.audio.currentTime = 0;
         this.audio.play().catch(() => {});
-      } else if (this.playMode === 'shuffle') {
-        const nextIdx = Math.floor(Math.random() * this.playlist.length);
-        this.playIndex(nextIdx);
       } else {
-        // 默认列表循环
         this.next();
       }
     }
 
-    // 毫秒级歌词同步
     _syncLyrics(currentTime) {
       if (!this.lyrics || this.lyrics.length === 0) return;
 
@@ -166,46 +159,68 @@
 
       if (idx !== this.currentLyricIdx) {
         this.currentLyricIdx = idx;
-        const currentLine = idx >= 0 ? this.lyrics[idx].text : "";
-        const nextLine = (idx + 1 < this.lyrics.length) ? this.lyrics[idx + 1].text : "";
+        const currentLine = idx >= 0 ? this.lyrics[idx].text : '';
+        const nextLine = idx + 1 < this.lyrics.length ? this.lyrics[idx + 1].text : '';
         this._emit('lyricUpdate', {
           index: idx,
           currentLine,
           nextLine,
-          allLines: this.lyrics
+          allLines: this.lyrics,
         });
       }
     }
 
-    // 获取当前歌词
-    async fetchLyrics(song) {
+    async fetchLyrics(song, token) {
       this.lyrics = [];
       this.currentLyricIdx = -1;
-      this._emit('lyricUpdate', { index: -1, currentLine: "正在匹配歌词...", nextLine: "", allLines: [] });
+      this._emit('lyricUpdate', {
+        index: -1,
+        currentLine: '正在匹配歌词...',
+        nextLine: '',
+        allLines: [],
+      });
 
       try {
         const plat = encodeURIComponent(song.platform || 'kw');
         const sid = encodeURIComponent(song.id || '');
         const title = encodeURIComponent(song.title || '');
         const artist = encodeURIComponent(song.artist || '');
-        const res = await fetch(`/api/lyric?platform=${plat}&id=${sid}&title=${title}&artist=${artist}`);
+        const res = await fetch(
+          `/api/lyric?platform=${plat}&id=${sid}&title=${title}&artist=${artist}`
+        );
         const lines = await res.json();
-        this.lyrics = lines || [];
+        if (token !== this._playToken) return;
+        this.lyrics = Array.isArray(lines) ? lines : [];
         if (this.lyrics.length === 0) {
-          this._emit('lyricUpdate', { index: -1, currentLine: "纯音乐，请欣赏", nextLine: "", allLines: [] });
+          this._emit('lyricUpdate', {
+            index: -1,
+            currentLine: '纯音乐或暂无歌词',
+            nextLine: '',
+            allLines: [],
+          });
         } else {
           this._syncLyrics(this.audio.currentTime || 0);
         }
-      } catch (e) {
+      } catch {
+        if (token !== this._playToken) return;
         this.lyrics = [];
-        this._emit('lyricUpdate', { index: -1, currentLine: "暂无歌词", nextLine: "", allLines: [] });
+        this._emit('lyricUpdate', {
+          index: -1,
+          currentLine: '暂无歌词',
+          nextLine: '',
+          allLines: [],
+        });
       }
     }
 
-    // 播放指定索引的曲目
     async playIndex(idx) {
       if (idx < 0 || idx >= this.playlist.length) return;
-      if (this.isResolving) return;
+
+      if (this._abortCtrl) {
+        this._abortCtrl.abort();
+      }
+      this._abortCtrl = new AbortController();
+      const token = ++this._playToken;
 
       this.currentIndex = idx;
       const song = this.playlist[idx];
@@ -214,51 +229,56 @@
       this._emit('trackChange', { index: idx, song });
       this._emit('stateChange', { isPlaying: false, isResolving: true, song });
 
-      // 并行请求歌词
-      this.fetchLyrics(song);
+      this.fetchLyrics(song, token);
 
       try {
         const t0 = performance.now();
         const res = await fetch('/api/resolve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(song)
+          body: JSON.stringify(song),
+          signal: this._abortCtrl.signal,
         });
         const data = await res.json();
+        if (token !== this._playToken) return;
+
         const cost = (performance.now() - t0).toFixed(0);
+        this.isResolving = false;
 
         if (data.success && data.url) {
           this.audio.src = data.url;
-          this.audio.play().catch(e => console.warn("自动出声受阻:", e));
+          this.audio.play().catch((e) => console.warn('自动出声受阻:', e));
           this._emit('stateChange', {
             isPlaying: true,
             isResolving: false,
             song,
             sourceName: data.source_name,
+            resolvedPlatform: data.platform,
+            strategy: data.strategy,
+            fallbackFrom: data.fallback_from,
             costMs: cost,
-            bytes: data.bytes
+            bytes: data.bytes || 0,
           });
         } else {
           this._emit('stateChange', {
             isPlaying: false,
             isResolving: false,
             song,
-            error: data.error || "所有音源轮询均未通过校验"
+            error: data.error || '所有音源通道均未通过校验',
           });
         }
       } catch (err) {
+        if (err?.name === 'AbortError' || token !== this._playToken) return;
+        this.isResolving = false;
         this._emit('stateChange', {
           isPlaying: false,
           isResolving: false,
           song,
-          error: "网络错误: " + err.message
+          error: '网络错误: ' + err.message,
         });
-      } finally {
-        this.isResolving = false;
       }
     }
 
-    // 播控方法
     togglePlay() {
       if (!this.audio.src) {
         if (this.playlist.length > 0) {
@@ -266,7 +286,6 @@
         }
         return;
       }
-
       if (this.audio.paused) {
         this.audio.play().catch(() => {});
       } else {
@@ -298,15 +317,10 @@
       this.audio.currentTime = pct * this.audio.duration;
     }
 
-    // 切换循环模式
     cycleMode() {
-      if (this.playMode === 'loop') {
-        this.playMode = 'single';
-      } else if (this.playMode === 'single') {
-        this.playMode = 'shuffle';
-      } else {
-        this.playMode = 'loop';
-      }
+      if (this.playMode === 'loop') this.playMode = 'single';
+      else if (this.playMode === 'single') this.playMode = 'shuffle';
+      else this.playMode = 'loop';
       return this.playMode;
     }
 
@@ -316,39 +330,24 @@
       return { mode: 'shuffle', icon: '🔀', label: '随机播放' };
     }
 
-    // 替换/设置当前播放列表（如搜索结果直接成为当前列表）
     setPlaylist(newList, autoPlayIndex = -1) {
       if (!Array.isArray(newList)) return;
       this.playlist = [...newList];
+      this.currentIndex = -1;
       this.isDefaultList = false;
       this._emit('playlistChange', { playlist: this.playlist, isDefault: false });
-
       if (autoPlayIndex >= 0 && autoPlayIndex < this.playlist.length) {
         this.playIndex(autoPlayIndex);
       }
     }
 
-    // 插入并立即播放一首歌
-    insertAndPlay(song) {
-      const existingIdx = this.playlist.findIndex(s => s.platform === song.platform && s.id === song.id);
-      if (existingIdx >= 0) {
-        this.playIndex(existingIdx);
-      } else {
-        this.playlist.splice(this.currentIndex + 1, 0, song);
-        this._emit('playlistChange', { playlist: this.playlist, isDefault: false });
-        this.playIndex(this.currentIndex + 1);
-      }
-    }
-
-    // 重置回默认精选歌单
     loadDefaultPlaylist() {
       this.playlist = [...DEFAULT_PLAYLIST];
       this.isDefaultList = true;
-      this.currentIndex = 0;
+      this.currentIndex = -1;
       this._emit('playlistChange', { playlist: this.playlist, isDefault: true });
     }
 
-    // 事件监听与派发
     on(event, callback) {
       if (this.listeners[event]) {
         this.listeners[event].push(callback);
@@ -357,14 +356,16 @@
 
     _emit(event, data) {
       if (this.listeners[event]) {
-        this.listeners[event].forEach(cb => {
-          try { cb(data); } catch (e) { console.error(e); }
+        this.listeners[event].forEach((cb) => {
+          try {
+            cb(data);
+          } catch (e) {
+            console.error(e);
+          }
         });
       }
     }
   }
 
-  // 挂载到全局
   window.MusicPlayer = MusicPlayer;
-
 })(window);
