@@ -284,24 +284,24 @@
         score: 100.0,
       },
       {
-        platform: 'kw',
-        id: '5046200',
-        songmid: '5046200',
+        platform: 'tx',
+        id: '000T1Ws32MWrUj',
+        songmid: '000T1Ws32MWrUj',
         title: '平凡之路',
         artist: '朴树',
         album: '猎户星座',
         duration: 301,
-        score: 95.0,
+        score: 100.0,
       },
       {
-        platform: 'kw',
-        id: '255280',
-        songmid: '255280',
+        platform: 'tx',
+        id: '001OyHbk2MSIi4',
+        songmid: '001OyHbk2MSIi4',
         title: '十年',
         artist: '陈奕迅',
-        album: '黑·白·灰',
+        album: '黑白灰',
         duration: 205,
-        score: 95.0,
+        score: 100.0,
       },
     ];
 
@@ -472,8 +472,14 @@
 
         this._emit('trackChange', { index: idx, song });
         this._emit('stateChange', { isPlaying: false, isResolving: true, song });
-
-        this.fetchLyrics(song, token);
+        this.lyrics = [];
+        this.currentLyricIdx = -1;
+        this._emit('lyricUpdate', {
+          index: -1,
+          currentLine: '正在匹配音源与歌词...',
+          nextLine: '',
+          allLines: [],
+        });
 
         try {
           const t0 = performance.now();
@@ -490,6 +496,12 @@
           this.isResolving = false;
 
           if (data.success && data.url) {
+            if (Array.isArray(data.lyrics) && data.lyrics.length > 0) {
+              this.lyrics = data.lyrics;
+              this._syncLyrics(0);
+            } else {
+              this.fetchLyrics(song, token);
+            }
             this.audio.src = data.url;
             this.audio.play().catch((e) => console.warn('自动出声受阻:', e));
             this._emit('stateChange', {

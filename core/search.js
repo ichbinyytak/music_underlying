@@ -1,24 +1,40 @@
 import { safeFetch } from './net.js';
-import { toSimple, cleanBrackets, calculateSongMatchScore } from './scoring.js';
+import {
+  toSimple,
+  cleanBrackets,
+  decodeHtmlEntities,
+  calculateSongMatchScore,
+} from './scoring.js';
 
 let mgFailStreak = 0;
 let mgLastFailAt = 0;
 
 function parseQueryIntent(q, explicitTitle, explicitArtist) {
-  const cleanQ = cleanBrackets(q) || String(q || '').trim();
-  let targetTitle = String(explicitTitle || '').trim();
-  let targetArtist = String(explicitArtist || '').trim();
+  const simplifiedK = toSimple(cleanBrackets(q));
+  let targetTitle = explicitTitle ? toSimple(cleanBrackets(explicitTitle)) : '';
+  let targetArtist = explicitArtist ? toSimple(explicitArtist) : '';
 
-  if (!targetTitle && !targetArtist) {
-    const parts = cleanQ.split(/\s+/).filter(Boolean);
+  if (targetTitle) {
+    // 保留显式传入的 title / artist
+  } else if (!targetArtist) {
+    const parts = simplifiedK.split(/\s*[\-_/|]\s*|\s+/).filter(Boolean);
     if (parts.length >= 2) {
-      targetTitle = parts.slice(0, parts.length - 1).join(' ');
+      targetTitle = parts.slice(0, -1).join(' ');
       targetArtist = parts[parts.length - 1];
     } else {
-      targetTitle = cleanQ;
+      targetTitle = simplifiedK;
     }
+  } else {
+    targetTitle = simplifiedK;
   }
-  return { searchQ: toSimple(cleanQ), targetTitle, targetArtist };
+
+  let queryK = simplifiedK.replace(/[\-_&/、+|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!queryK) queryK = simplifiedK;
+  if (targetArtist && !queryK.toLowerCase().includes(targetArtist.toLowerCase())) {
+    queryK = `${queryK} ${targetArtist}`.trim();
+  }
+
+  return { searchQ: queryK, targetTitle, targetArtist };
 }
 
 async function searchKuwo(searchQ, targetTitle, targetArtist, limit, targetDuration) {
@@ -33,10 +49,12 @@ async function searchKuwo(searchQ, targetTitle, targetArtist, limit, targetDurat
     });
     if (!res.ok) return out;
     const data = await res.json();
-    for (const it of data?.abslist || []) {
-      const sname = it.SONGNAME || '';
-      const sart = it.ARTIST || '';
-      const salb = it.ALBUM || '';
+    const list = data?.abslist || [];
+    for (let idx = 0; idx < list.length; idx++) {
+      const it = list[idx];
+      const sname = decodeHtmlEntities(it.SONGNAME || '');
+      const sart = decodeHtmlEntities(it.ARTIST || '');
+      const salb = decodeHtmlEntities(it.ALBUM || '');
       const sdur = parseInt(it.DURATION || '0', 10) || 0;
       const rid = String(it.MUSICRID || '').replace('MUSIC_', '');
       if (!rid) continue;
@@ -59,6 +77,7 @@ async function searchKuwo(searchQ, targetTitle, targetArtist, limit, targetDurat
           album: salb,
           duration: sdur,
           score: Math.round(score * 10) / 10,
+          _rank: idx,
         });
       }
     }
@@ -80,10 +99,14 @@ async function searchNetease(searchQ, targetTitle, targetArtist, limit, targetDu
     });
     if (!res.ok) return out;
     const data = await res.json();
-    for (const s of data?.result?.songs || []) {
-      const sname = s.name || '';
-      const sart = (s.artists || []).map((a) => a.name).filter(Boolean).join('/');
-      const salb = s.album?.name || '';
+    const songs = data?.result?.songs || [];
+    for (let idx = 0; idx < songs.length; idx++) {
+      const s = songs[idx];
+      const sname = decodeHtmlEntities(s.name || '');
+      const sart = decodeHtmlEntities(
+        (s.artists || []).map((a) => a.name).filter(Boolean).join('/')
+      );
+      const salb = decodeHtmlEntities(s.album?.name || '');
       const sdur = s.duration ? Math.round(s.duration / 1000) : 0;
       const sid = s.id ? String(s.id) : '';
       if (!sid) continue;
@@ -106,6 +129,7 @@ async function searchNetease(searchQ, targetTitle, targetArtist, limit, targetDu
           album: salb,
           duration: sdur,
           score: Math.round(score * 10) / 10,
+          _rank: idx,
         });
       }
     }
@@ -130,10 +154,14 @@ async function searchQQ(searchQ, targetTitle, targetArtist, limit, targetDuratio
     });
     if (!res.ok) return out;
     const data = await res.json();
-    for (const s of data?.data?.song?.list || []) {
-      const sname = s.songname || '';
-      const sart = (s.singer || []).map((a) => a.name).filter(Boolean).join('/');
-      const salb = s.albumname || '';
+    const list = data?.data?.song?.list || [];
+    for (let idx = 0; idx < list.length; idx++) {
+      const s = list[idx];
+      const sname = decodeHtmlEntities(s.songname || '');
+      const sart = decodeHtmlEntities(
+        (s.singer || []).map((a) => a.name).filter(Boolean).join('/')
+      );
+      const salb = decodeHtmlEntities(s.albumname || '');
       const sdur = Number(s.interval) || 0;
       const smid = s.songmid || '';
       if (!smid) continue;
@@ -156,6 +184,7 @@ async function searchQQ(searchQ, targetTitle, targetArtist, limit, targetDuratio
           album: salb,
           duration: sdur,
           score: Math.round(score * 10) / 10,
+          _rank: idx,
         });
       }
     }
@@ -177,10 +206,12 @@ async function searchKugou(searchQ, targetTitle, targetArtist, limit, targetDura
     });
     if (!res.ok) return out;
     const data = await res.json();
-    for (const item of data?.data?.lists || []) {
-      const sname = String(item.SongName || '').replace(/<.*?>/g, '').trim();
-      const sart = String(item.SingerName || '').replace(/<.*?>/g, '').trim();
-      const salb = String(item.AlbumName || '').replace(/<.*?>/g, '').trim();
+    const lists = data?.data?.lists || [];
+    for (let idx = 0; idx < lists.length; idx++) {
+      const item = lists[idx];
+      const sname = decodeHtmlEntities(String(item.SongName || '').replace(/<.*?>/g, '').trim());
+      const sart = decodeHtmlEntities(String(item.SingerName || '').replace(/<.*?>/g, '').trim());
+      const salb = decodeHtmlEntities(String(item.AlbumName || '').replace(/<.*?>/g, '').trim());
       const sdur = Number(item.Duration) || 0;
       const hash = item.FileHash || '';
       if (!hash) continue;
@@ -204,6 +235,7 @@ async function searchKugou(searchQ, targetTitle, targetArtist, limit, targetDura
           album: salb,
           duration: sdur,
           score: Math.round(score * 10) / 10,
+          _rank: idx,
         });
       }
     }
@@ -229,10 +261,14 @@ async function searchMigu(searchQ, targetTitle, targetArtist, limit, targetDurat
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     mgFailStreak = 0;
-    for (const item of data?.songResultData?.result || []) {
-      const sname = String(item.name || '').trim();
-      const sart = (item.singers || []).map((a) => a.name).filter(Boolean).join('/');
-      const salb = item.albums?.[0]?.name || '';
+    const list = data?.songResultData?.result || [];
+    for (let idx = 0; idx < list.length; idx++) {
+      const item = list[idx];
+      const sname = decodeHtmlEntities(String(item.name || '').trim());
+      const sart = decodeHtmlEntities(
+        (item.singers || []).map((a) => a.name).filter(Boolean).join('/')
+      );
+      const salb = decodeHtmlEntities(item.albums?.[0]?.name || '');
       const sdur = Number(item.interval) || 0;
       const cid = String(item.copyrightId || item.id || '');
       if (!cid) continue;
@@ -255,6 +291,7 @@ async function searchMigu(searchQ, targetTitle, targetArtist, limit, targetDurat
           album: salb,
           duration: sdur,
           score: Math.round(score * 10) / 10,
+          _rank: idx,
         });
       }
     }
@@ -273,8 +310,21 @@ const PLATFORM_SEARCHERS = {
   mg: searchMigu,
 };
 
+async function runConcurrentSearch(platforms, searchQ, targetTitle, targetArtist, limit, targetDuration) {
+  const settled = await Promise.all(
+    platforms.map((p) => {
+      const fn = PLATFORM_SEARCHERS[p];
+      return fn
+        ? fn(searchQ, targetTitle, targetArtist, limit, targetDuration)
+        : Promise.resolve([]);
+    })
+  );
+  return settled.flat();
+}
+
 /**
- * 五平台并发搜歌（wy / tx / kw / kg / mg），繁简归一 + 严打分去翻唱/伴奏。
+ * 五平台并发搜歌（tx / kw / wy / kg / mg），对标 Amusic：
+ * 多分隔符意图拆解 + 繁简归一 + 严打分去翻唱/伴奏 + 热度排序 + 多艺人降维重试。
  */
 export async function searchMultiPlatform(q, opts = {}) {
   const rawQ = String(q || '').trim();
@@ -286,37 +336,55 @@ export async function searchMultiPlatform(q, opts = {}) {
     opts.artist
   );
   const limitPerPlatform = opts.limitPerPlatform ?? 6;
-  const targetDuration = opts.duration || 0;
-  const platforms = Array.isArray(opts.platforms) && opts.platforms.length > 0
-    ? opts.platforms
-    : ['tx', 'kw', 'wy', 'kg', 'mg'];
+  const targetDuration = Number(opts.duration) || 0;
+  const platforms =
+    Array.isArray(opts.platforms) && opts.platforms.length > 0
+      ? opts.platforms
+      : ['tx', 'kw', 'wy', 'kg', 'mg'];
 
-  const settled = await Promise.all(
-    platforms.map((p) => {
-      const fn = PLATFORM_SEARCHERS[p];
-      return fn
-        ? fn(searchQ, targetTitle, targetArtist, limitPerPlatform, targetDuration)
-        : Promise.resolve([]);
-    })
+  let rawResults = await runConcurrentSearch(
+    platforms,
+    searchQ,
+    targetTitle,
+    targetArtist,
+    limitPerPlatform,
+    targetDuration
   );
 
-  const merged = [];
-  const seen = new Set();
-  for (const list of settled) {
-    for (const item of list) {
-      const key = `${item.platform}:${item.id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(item);
+  // 多歌手合唱或 feat 降维重试
+  if (rawResults.length === 0 && targetArtist) {
+    const primaryArtist = cleanBrackets(
+      targetArtist.split(/[,/&、]|feat\.?/i)[0] || ''
+    ).trim();
+    const cleanT = cleanBrackets(targetTitle).trim();
+    if (primaryArtist && cleanT && (primaryArtist !== targetArtist || cleanT !== targetTitle)) {
+      rawResults = await runConcurrentSearch(
+        platforms,
+        `${cleanT} ${primaryArtist}`,
+        cleanT,
+        primaryArtist,
+        limitPerPlatform,
+        targetDuration
+      );
     }
   }
 
-  // 同分情况下优先排序拥有高可用 VIP/直链的平台 (tx -> kw -> wy -> kg -> mg)
+  const merged = [];
+  const seen = new Set();
+  for (const item of rawResults) {
+    const key = `${item.platform}:${item.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+
+  // 排序：分数优先 -> 平台官方搜索热度位次 (_rank) -> 平台可用权重
   const platWeight = { tx: 5, kw: 4, wy: 3, kg: 2, mg: 1 };
   merged.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    if ((a._rank ?? 99) !== (b._rank ?? 99)) return (a._rank ?? 99) - (b._rank ?? 99);
     return (platWeight[b.platform] || 0) - (platWeight[a.platform] || 0);
   });
 
-  return merged;
+  return merged.map(({ _rank, ...rest }) => rest);
 }

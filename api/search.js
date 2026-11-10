@@ -14,12 +14,13 @@ export async function GET(request) {
 
   const title = (searchParams.get('title') || '').trim();
   const artist = (searchParams.get('artist') || '').trim();
+  const duration = Number(searchParams.get('duration') || '0') || 0;
   const platParam = (searchParams.get('platforms') || '').trim();
   const platforms = platParam
     ? platParam.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
     : undefined;
 
-  const candidates = await searchMultiPlatform(q, { title, artist, platforms });
+  const candidates = await searchMultiPlatform(q, { title, artist, duration, platforms });
   return jsonResponse(candidates, 200, {
     'Cache-Control': 'public, max-age=1800',
   });

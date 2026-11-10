@@ -6,12 +6,15 @@ import {
 } from './sources.js';
 import { normalizePlatform } from './scoring.js';
 import { searchMultiPlatform } from './search.js';
+import { getSongLyric } from './lyric.js';
 
-/**
- * 在一批端点中并发竞速，返回第一个通过完整音频校验的结果。
- */
-async function raceBatch(endpoints, songInfo, timeoutMs = 3000) {
-  if (!endpoints || endpoints.length === 0) return null;
+// 15 分钟内存热点缓存（防 Token 过期 403，重复切歌 0ms 秒开）
+const RESOLVE_CACHE = new Map();
+const RESOLVE_CACHE_MAX = 256;
+const RESOLVE_CACHE_TTL_MS = 15 * 60 * 1000;
+
+async function raceBatch(endpoints, songInfo, timeoutMs) {
+  if (!endpoints || endpoints.length === 0 || timeoutMs < 400) return null;
 
   const attempts = endpoints.map((ep) =>
     probeEndpoint(ep, songInfo, { timeoutMs }).then((res) => {
@@ -31,16 +34,19 @@ async function raceBatch(endpoints, songInfo, timeoutMs = 3000) {
   }
 }
 
-async function resolveWithEndpoints(endpoints, songInfo, batchSize = 2, timeoutMs = 3000) {
+async function resolveWithEndpoints(endpoints, songInfo, deadline, batchSize = 3, perStepCap = 2800) {
   for (let i = 0; i < endpoints.length; i += batchSize) {
+    const remaining = deadline - Date.now();
+    if (remaining < 500) break;
+    const stepTimeout = Math.min(perStepCap, remaining - 150);
     const batch = endpoints.slice(i, i + batchSize);
-    const hit = await raceBatch(batch, songInfo, timeoutMs);
+    const hit = await raceBatch(batch, songInfo, stepTimeout);
     if (hit) return hit;
   }
   return null;
 }
 
-function formatWinner(hit, strategy, fallbackFrom = null) {
+function formatWinner(hit, strategy, lyrics = [], extra = {}) {
   const { ep, res } = hit;
   return {
     success: true,
@@ -53,25 +59,41 @@ function formatWinner(hit, strategy, fallbackFrom = null) {
     match_mode: ep.matchMode || 'id',
     quality: ep.supportQualities?.[0] || '320k',
     strategy,
-    ...(fallbackFrom ? { fallback_from: fallbackFrom } : {}),
+    lyrics,
+    ...extra,
   };
 }
 
 /**
- * 三阶梯智能寻链解析引擎：
- * 1. 同平台精准 ID 通道竞速（matchMode === 'id'，零翻唱风险）
- * 2. 同平台关键词搜索通道（matchMode === 'search'，内置歌名/歌手一致性防线）
- * 3. 跨平台同名正版自动兜底（如 kw 失败自动去 tx VIP / wy / kg 重搜并竞速解析）
+ * 三阶梯智能寻链解析引擎（对标 Amusic，含 7.5s 全局预算、音画并行、自动跨平台容灾）：
+ * - 支持传入精确 (platform + id) 或仅传入 (title + artist + duration)
+ * - 并行拉取时间轴歌词并一并返回 lyrics
  */
 export async function resolveBestStream(cand = {}) {
+  const deadline = Date.now() + 7500;
+  const hasExplicitPlatform = Boolean(cand.platform);
   const plat = normalizePlatform(cand.platform || 'kw');
   const sid = String(cand.id || cand.songmid || cand.hash || '').trim();
   const title = String(cand.title || cand.name || '').trim();
   const artist = String(cand.artist || cand.singer || '').trim();
-  const duration = Number(cand.duration) || 0;
+  const duration =
+    Number(cand.duration) ||
+    (cand.durationMillis ? Math.round(Number(cand.durationMillis) / 1000) : 0) ||
+    0;
+  const forceRefresh = Boolean(cand.force_refresh);
 
   if (!sid && !title) {
     return { success: false, error: '缺少歌曲 ID 或歌名' };
+  }
+
+  const cacheKey = `${hasExplicitPlatform ? plat : 'any'}:${sid}:${title.toLowerCase()}:${artist.toLowerCase()}`;
+  if (!forceRefresh) {
+    const cached = RESOLVE_CACHE.get(cacheKey);
+    if (cached && Date.now() - cached.ts < RESOLVE_CACHE_TTL_MS) {
+      return { ...cached.data, cached: true };
+    }
+  } else {
+    RESOLVE_CACHE.delete(cacheKey);
   }
 
   const normalizedSong = {
@@ -82,49 +104,103 @@ export async function resolveBestStream(cand = {}) {
     hash: cand.hash || sid,
     title,
     artist,
+    duration,
   };
 
-  // 第 1 阶梯：同平台 ID 精准通道
+  // 音画并行：提前异步并发拉取歌词
+  const lyricPromise = getSongLyric({ platform: plat, id: sid, title, artist }).catch(() => []);
+  const collectLyrics = async () => {
+    const rem = Math.max(150, Math.min(1000, deadline - Date.now()));
+    try {
+      return await Promise.race([
+        lyricPromise,
+        new Promise((r) => setTimeout(() => r([]), rem)),
+      ]);
+    } catch {
+      return [];
+    }
+  };
+
+  const cacheAndReturn = (result) => {
+    if (result.success) {
+      if (RESOLVE_CACHE.size >= RESOLVE_CACHE_MAX) {
+        const firstKey = RESOLVE_CACHE.keys().next().value;
+        if (firstKey !== undefined) RESOLVE_CACHE.delete(firstKey);
+      }
+      RESOLVE_CACHE.set(cacheKey, { data: result, ts: Date.now() });
+    }
+    return result;
+  };
+
+  // 第 1 阶梯：若提供了明确 ID，优先走同平台 ID 精准通道
   if (sid) {
     const idEndpoints = getOrderedEndpoints(plat, 'id');
-    const hit = await resolveWithEndpoints(idEndpoints, normalizedSong, 3, 2800);
-    if (hit) return formatWinner(hit, 'same_platform_id');
+    const hit = await resolveWithEndpoints(idEndpoints, normalizedSong, deadline, 3, 2800);
+    if (hit) {
+      return cacheAndReturn(formatWinner(hit, 'same_platform_id', await collectLyrics()));
+    }
   }
 
   // 第 2 阶梯：同平台 Search 通道
-  if (title) {
+  if (title && sid && deadline - Date.now() > 800) {
     const searchEndpoints = getOrderedEndpoints(plat, 'search');
-    const hit = await resolveWithEndpoints(searchEndpoints, normalizedSong, 2, 2800);
-    if (hit) return formatWinner(hit, 'same_platform_search');
+    const hit = await resolveWithEndpoints(searchEndpoints, normalizedSong, deadline, 2, 2600);
+    if (hit) {
+      return cacheAndReturn(formatWinner(hit, 'same_platform_search', await collectLyrics()));
+    }
   }
 
-  // 第 3 阶梯：跨平台同名正版自动重搜兜底（充分发挥 5 平台优势）
-  if (title) {
-    const allOtherEndpoints = getOrderedEndpoints().filter((ep) => ep.platform !== plat);
-    const activeOtherPlats = [...new Set(allOtherEndpoints.map((ep) => ep.platform))];
+  // 第 3 阶梯：无 ID（纯元数据调用）或同平台全部失败 -> 多平台并发重搜并逐平台优选竞速
+  if (title && deadline - Date.now() > 1000) {
+    const allEndpoints = getOrderedEndpoints();
+    const activePlats = [...new Set(allEndpoints.map((ep) => ep.platform))];
+    const targetPlats = sid ? activePlats.filter((p) => p !== plat) : activePlats;
 
-    if (activeOtherPlats.length > 0) {
+    if (targetPlats.length > 0) {
       const q = `${title} ${artist}`.trim();
       const crossCands = await searchMultiPlatform(q, {
         title,
         artist,
         duration,
-        platforms: activeOtherPlats,
-        limitPerPlatform: 2,
+        platforms: targetPlats,
+        limitPerPlatform: 3,
       });
 
-      for (const alt of crossCands.slice(0, 4)) {
-        const altIdEndpoints = getOrderedEndpoints(alt.platform, 'id');
-        const hit = await resolveWithEndpoints(altIdEndpoints, alt, 2, 2600);
-        if (hit) return formatWinner(hit, 'cross_platform_id', plat);
+      // 每平台挑选最优 1 条候选，最多尝试前 4 个平台
+      const picked = [];
+      const seenPlats = new Set();
+      for (const c of crossCands) {
+        if (!seenPlats.has(c.platform)) {
+          picked.push(c);
+          seenPlats.add(c.platform);
+          if (picked.length >= 4) break;
+        }
       }
 
-      const otherSearchEndpoints = allOtherEndpoints.filter(
-        (ep) => (ep.matchMode || 'id') === 'search'
-      );
-      if (otherSearchEndpoints.length > 0) {
-        const hit = await resolveWithEndpoints(otherSearchEndpoints, normalizedSong, 2, 2600);
-        if (hit) return formatWinner(hit, 'cross_platform_search', plat);
+      for (const alt of picked) {
+        if (deadline - Date.now() < 800) break;
+        const altIdEndpoints = getOrderedEndpoints(alt.platform, 'id');
+        const hit = await resolveWithEndpoints(altIdEndpoints, alt, deadline, 2, 2400);
+        if (hit) {
+          return cacheAndReturn(
+            formatWinner(hit, sid ? 'cross_platform_id' : 'search_then_id', await collectLyrics(), {
+              matched_candidate: alt,
+              ...(sid ? { fallback_from: plat } : {}),
+            })
+          );
+        }
+      }
+
+      const searchEndpoints = allEndpoints.filter((ep) => (ep.matchMode || 'id') === 'search');
+      if (searchEndpoints.length > 0 && deadline - Date.now() > 800) {
+        const hit = await resolveWithEndpoints(searchEndpoints, normalizedSong, deadline, 2, 2400);
+        if (hit) {
+          return cacheAndReturn(
+            formatWinner(hit, sid ? 'cross_platform_search' : 'search_endpoint', await collectLyrics(), {
+              ...(sid ? { fallback_from: plat } : {}),
+            })
+          );
+        }
       }
     }
   }
