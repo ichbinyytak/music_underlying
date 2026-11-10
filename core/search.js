@@ -29,7 +29,7 @@ async function searchKuwo(searchQ, targetTitle, targetArtist, limit, targetDurat
     )}&pn=0&rn=${limit}&uid=794762528&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newsearch=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1`;
     const { res } = await safeFetch(url, {
       headers: { 'User-Agent': 'okhttp/3.10.0' },
-      timeoutMs: 2200,
+      timeoutMs: 4000,
     });
     if (!res.ok) return out;
     const data = await res.json();
@@ -76,7 +76,7 @@ async function searchNetease(searchQ, targetTitle, targetArtist, limit, targetDu
     )}&type=1&offset=0&limit=${limit}`;
     const { res } = await safeFetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' },
-      timeoutMs: 2200,
+      timeoutMs: 4000,
     });
     if (!res.ok) return out;
     const data = await res.json();
@@ -126,7 +126,7 @@ async function searchQQ(searchQ, targetTitle, targetArtist, limit, targetDuratio
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         Referer: 'https://y.qq.com/',
       },
-      timeoutMs: 2400,
+      timeoutMs: 4000,
     });
     if (!res.ok) return out;
     const data = await res.json();
@@ -173,7 +173,7 @@ async function searchKugou(searchQ, targetTitle, targetArtist, limit, targetDura
     )}&page=1&pagesize=${limit}&filter=2&iscorrection=1`;
     const { res } = await safeFetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      timeoutMs: 2200,
+      timeoutMs: 4000,
     });
     if (!res.ok) return out;
     const data = await res.json();
@@ -224,7 +224,7 @@ async function searchMigu(searchQ, targetTitle, targetArtist, limit, targetDurat
     )}&pageNo=1&pageSize=${limit}&searchSwitch=%7B%22song%22%3A1%7D`;
     const { res } = await safeFetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0', channel: '0146951' },
-      timeoutMs: 1400,
+      timeoutMs: 2000,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();

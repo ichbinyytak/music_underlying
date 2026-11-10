@@ -3,6 +3,8 @@ import t2sMap from './t2s_map.js';
 const FORBIDDEN_KWS = [
   'cover',
   '翻唱',
+  '原唱',
+  '翻自',
   '伴奏',
   '伴奏版',
   '纯伴奏',
@@ -15,6 +17,8 @@ const FORBIDDEN_KWS = [
   '升调',
   '片段',
   '铃声',
+  '吉他版',
+  '钢琴版',
 ];
 
 export function toSimple(txt) {
@@ -137,8 +141,12 @@ export function calculateSongMatchScore(
     }
 
     if (tTokens.length > 0) {
-      const tokenRatio = Math.min(1.0, matchedTokens / tTokens.length);
-      score += 35.0 * tokenRatio;
+      if (matchedTokens === 0) {
+        score -= 35.0;
+      } else {
+        const tokenRatio = Math.min(1.0, matchedTokens / tTokens.length);
+        score += 35.0 * tokenRatio;
+      }
     } else {
       score += 20.0;
     }

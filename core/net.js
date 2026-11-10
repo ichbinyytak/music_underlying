@@ -194,13 +194,7 @@ async function readHeadUpTo(res, maxBytes) {
   };
 }
 
-/**
- * 音频直链物理真机门禁：
- * 1. Range: bytes=0-16383 仅嗅探首包 16KB
- * 2. 音频文件头魔数验证（拦截 HTML/JSON 报错页与假直链）
- * 3. 文件大小 >= 1.2MB（拦截 30s 试听截断与 81KB 语音提示）
- */
-export async function verifyAudioStream(url, opts = {}) {
+async function probeAudioOnce(url, opts = {}) {
   const t0 = Date.now();
   const timeoutMs = opts.timeoutMs ?? 2500;
   const minBytes = opts.minBytes ?? MIN_VALID_BYTES;
@@ -301,4 +295,24 @@ export async function verifyAudioStream(url, opts = {}) {
       latencyMs: Date.now() - t0,
     };
   }
+}
+
+/**
+ * 音频直链物理真机门禁：
+ * 1. Range: bytes=0-16383 仅嗅探首包 16KB
+ * 2. 音频文件头魔数验证（拦截 HTML/JSON 报错页与假直链）
+ * 3. 文件大小 >= 1.2MB（拦截 30s 试听截断与 81KB 语音提示）
+ * 4. 优先尝试 HTTPS 升级，避免浏览器 Mixed Content 拦截播放
+ */
+export async function verifyAudioStream(url, opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? 2500;
+  if (typeof url === 'string' && url.startsWith('http://')) {
+    const httpsUrl = 'https://' + url.slice(7);
+    const httpsRes = await probeAudioOnce(httpsUrl, {
+      ...opts,
+      timeoutMs: Math.min(2000, timeoutMs),
+    });
+    if (httpsRes.ok) return httpsRes;
+  }
+  return probeAudioOnce(url, opts);
 }
